@@ -94,11 +94,21 @@ final class NanoLoginItem: ObservableObject {
     }
 }
 
-struct NanoUpdate: Equatable, Sendable {
+struct NanoUpdate: Equatable, Codable, Sendable {
     let version: String
     let downloadURL: URL
     let pageURL: URL
     let notes: String?
+
+    /// The first line of the release notes that says something: headings and
+    /// list markers are skipped, so "## What's new\n- Faster tray" gives
+    /// "Faster tray".
+    var summary: String? {
+        notes?.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty && !$0.hasPrefix("#") }
+            .map { String($0.drop { "-*• ".contains($0) }) }
+    }
 
     static let preview = NanoUpdate(
         version: "1.0.1",
@@ -130,11 +140,29 @@ final class NanoUpdateChecker: ObservableObject {
     /// Automatic checks run at most this often.
     static let interval: TimeInterval = 24 * 60 * 60
     private static let lastCheckedKey = "updates.lastCheckedAt"
+    private static let pendingKey = "updates.pending"
 
+    /// A found update is kept, so the menu item, banner, and sidebar dot come
+    /// back after a restart. It goes once this version is the one running.
     init(settings: NanoSettings, defaults: UserDefaults = .standard, session: URLSession = .shared) {
         self.settings = settings
         self.defaults = defaults
         self.session = session
+        if let data = defaults.data(forKey: Self.pendingKey),
+           let update = try? JSONDecoder().decode(NanoUpdate.self, from: data),
+           Self.isVersion(update.version, newerThan: NanoAppInfo.version) {
+            status = .available(update)
+        } else {
+            defaults.removeObject(forKey: Self.pendingKey)
+        }
+    }
+
+    private func remember(_ update: NanoUpdate?) {
+        if let update, let data = try? JSONEncoder().encode(update) {
+            defaults.set(data, forKey: Self.pendingKey)
+        } else {
+            defaults.removeObject(forKey: Self.pendingKey)
+        }
     }
 
     var available: NanoUpdate? {
@@ -176,11 +204,12 @@ final class NanoUpdateChecker: ObservableObject {
             switch result {
             case let .success(update?):
                 defaults.set(Date(), forKey: Self.lastCheckedKey)
-                status = Self.isVersion(update.version, newerThan: NanoAppInfo.version)
-                    ? .available(update)
-                    : .current(checkedAt: Date())
+                let newer = Self.isVersion(update.version, newerThan: NanoAppInfo.version)
+                remember(newer ? update : nil)
+                status = newer ? .available(update) : .current(checkedAt: Date())
             case .success(nil):
                 defaults.set(Date(), forKey: Self.lastCheckedKey)
+                remember(nil)
                 status = .noReleases(checkedAt: Date())
             case let .failure(message):
                 status = .failed(message)
@@ -191,6 +220,11 @@ final class NanoUpdateChecker: ObservableObject {
     func download() {
         guard let update = available, Self.isSecure(update.downloadURL) else { return }
         NSWorkspace.shared.open(update.downloadURL)
+    }
+
+    func openNotes() {
+        guard let update = available, Self.isSecure(update.pageURL) else { return }
+        NSWorkspace.shared.open(update.pageURL)
     }
 
     /// The feed is only trusted to send the browser to an https address.

@@ -128,6 +128,27 @@ final class NanoOnboardingTests: XCTestCase {
         XCTAssertTrue(NanoUpdateChecker.isVersion("1.0.0-beta.2", newerThan: "1.0.0-beta.1"))
         XCTAssertTrue(NanoUpdateChecker.isVersion("1.0.1-beta.1", newerThan: "1.0.0"))
     }
+
+    func testFoundUpdateSurvivesARelaunchUntilItIsInstalled() throws {
+        let settings = NanoSettings(defaults: defaults)
+        let newer = NanoUpdate(
+            version: "999.0.0",
+            downloadURL: URL(string: "https://example.com/Nano.dmg")!,
+            pageURL: URL(string: "https://example.com/release")!,
+            notes: nil
+        )
+        defaults.set(try JSONEncoder().encode(newer), forKey: "updates.pending")
+        XCTAssertEqual(NanoUpdateChecker(settings: settings, defaults: defaults).available, newer)
+
+        let installed = NanoUpdate(version: NanoAppInfo.version, downloadURL: newer.downloadURL, pageURL: newer.pageURL, notes: nil)
+        defaults.set(try JSONEncoder().encode(installed), forKey: "updates.pending")
+        XCTAssertNil(NanoUpdateChecker(settings: settings, defaults: defaults).available)
+        XCTAssertNil(defaults.data(forKey: "updates.pending"))
+    }
+
+    func testUpdateSummarySkipsHeadingsAndListMarkers() {
+        XCTAssertEqual(NanoUpdate.preview.summary, "Faster tray and a quieter Mixer")
+    }
 }
 
 @MainActor

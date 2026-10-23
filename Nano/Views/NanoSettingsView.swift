@@ -425,6 +425,9 @@ struct NanoSettingsView: View {
                 .font(.system(size: 13))
                 .lineLimit(1)
             Spacer(minLength: 4)
+            if item == .privacy {
+                UpdateWaitingDot(checker: viewModel.updateChecker, selected: selected)
+            }
             if missing > 0 {
                 Text("\(missing)")
                     .font(.system(size: 10.5, weight: .semibold, design: .rounded))
@@ -2209,6 +2212,22 @@ private struct LoginItemRow: View {
     }
 }
 
+/// Beside Privacy & About while an update is waiting. Blue, so it doesn't
+/// read as a problem the way the orange permissions count does.
+private struct UpdateWaitingDot: View {
+    @ObservedObject var checker: NanoUpdateChecker
+    let selected: Bool
+
+    var body: some View {
+        if let update = checker.available {
+            Circle()
+                .fill(selected ? Color.white : Color.accentColor)
+                .frame(width: 8, height: 8)
+                .help("Nano \(update.version) is available")
+        }
+    }
+}
+
 private struct UpdateAvailableBanner: View {
     @ObservedObject var checker: NanoUpdateChecker
 
@@ -2230,8 +2249,11 @@ private struct UpdateStatusRow: View {
     var body: some View {
         SettingsRow(title, subtitle: subtitle, subtitleIsWarning: isFailure) {
             if checker.available != nil {
+                Button("Notes", action: checker.openNotes)
+                    .controlSize(.small)
                 Button("Download", action: checker.download)
                     .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
             } else {
                 Button("Check Now", action: checker.checkNow)
                     .controlSize(.small)
@@ -2259,8 +2281,8 @@ private struct UpdateStatusRow: View {
     private var subtitle: String? {
         switch checker.status {
         case let .failed(message): message
-        case let .available(update): update.notes?.split(whereSeparator: \.isNewline).first.map(String.init)
-            ?? "You have \(NanoAppInfo.version)."
+        case let .available(update): ["You have \(NanoAppInfo.version)", update.summary.map { "What's new: \($0)" }]
+            .compactMap { $0 }.joined(separator: " · ")
         case let .current(date), let .noReleases(date): "Checked \(Self.relative(date))"
         case .idle, .checking: checker.lastCheckedAt.map { "Last checked \(Self.relative($0))" }
         }
