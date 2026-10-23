@@ -1,0 +1,12 @@
+{
+  "name": "cursor-conversation-jump",
+  "displayName": "Nano Cursor Jump",
+  "description": "Opens a specific Cursor agent conversation from Nano.",
+  "version": "0.1.2",
+  "publisher": "nano",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished", "onUri"],
+  "main": "./extension.js",
+  "contributes": {}
+}

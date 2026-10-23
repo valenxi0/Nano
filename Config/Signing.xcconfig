@@ -1,0 +1,9 @@
+// Signing for local Debug builds.
+//
+// The project ships with no Apple team. To sign Debug builds with yours, copy
+// Signing.local.xcconfig.example to Signing.local.xcconfig (it is gitignored)
+// and set DEVELOPMENT_TEAM. The tools/ build scripts read the same file, or
+// NANO_DEVELOPMENT_TEAM from the environment.
+DEVELOPMENT_TEAM =
+
+#include? "Signing.local.xcconfig"

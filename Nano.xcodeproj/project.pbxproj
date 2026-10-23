@@ -1,0 +1,754 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AF1000000000000000000001 /* NotificationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF2000000000000000000001 /* NotificationRouter.swift */; };
+		BF0000000000000000000001 /* nano-opencode-plugin.js in Resources */ = {isa = PBXBuildFile; fileRef = BF0000000000000000000002 /* nano-opencode-plugin.js */; };
+		BF0000000000000000000014 /* nano-pi-extension.ts in Resources */ = {isa = PBXBuildFile; fileRef = BF0000000000000000000015 /* nano-pi-extension.ts */; };
+		BF0000000000000000000010 /* nano-cursor-jump-package.json in Resources */ = {isa = PBXBuildFile; fileRef = BF0000000000000000000011 /* nano-cursor-jump-package.json */; };
+		BF0000000000000000000012 /* nano-cursor-jump-extension.js in Resources */ = {isa = PBXBuildFile; fileRef = BF0000000000000000000013 /* nano-cursor-jump-extension.js */; };
+		A10000000000000000000001 /* NanoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* NanoApp.swift */; };
+		A10000000000000000000002 /* NanoAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* NanoAppDelegate.swift */; };
+		A10000000000000000000003 /* IslandState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* IslandState.swift */; };
+		A10000000000000000000004 /* NanoSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* NanoSettings.swift */; };
+		A10000000000000000000005 /* IslandPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* IslandPanel.swift */; };
+		A10000000000000000000006 /* IslandRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* IslandRootView.swift */; };
+		A10000000000000000000007 /* NanoMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* NanoMark.swift */; };
+		A10000000000000000000008 /* NanoSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* NanoSettingsView.swift */; };
+		A10000000000000000000092 /* SettingsHoverIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000092 /* SettingsHoverIcons.swift */; };
+		A10000000000000000000093 /* NanoSettingsPermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000093 /* NanoSettingsPermissions.swift */; };
+		A10000000000000000000096 /* NanoSetupChecklistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000096 /* NanoSetupChecklistView.swift */; };
+		0B10000000000000000000A1 /* OnboardingIslandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B20000000000000000000A1 /* OnboardingIslandView.swift */; };
+		0B10000000000000000000A2 /* OnboardingFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B20000000000000000000A2 /* OnboardingFlow.swift */; };
+		0B10000000000000000000A3 /* OnboardingExperienceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B20000000000000000000A3 /* OnboardingExperienceView.swift */; };
+		0B10000000000000000000A4 /* OnboardingStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B20000000000000000000A4 /* OnboardingStage.swift */; };
+		0B30000000000000000000A1 /* Onboarding in Resources */ = {isa = PBXBuildFile; fileRef = 0B40000000000000000000A1 /* Onboarding */; };
+		A10000000000000000000097 /* NanoOnboardingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000097 /* NanoOnboardingTests.swift */; };
+		A10000000000000000000009 /* IslandStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* IslandStateTests.swift */; };
+		DB100000000000000000000005 /* SettingsWindowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB200000000000000000000005 /* SettingsWindowUITests.swift */; };
+		A10000000000000000000040 /* TokenLedgerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000040 /* TokenLedgerTests.swift */; };
+		A10000000000000000000077 /* AgentHookUninstallTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000077 /* AgentHookUninstallTests.swift */; };
+		DV1000000000000000000001 /* AgentDevinHookTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DV2000000000000000000001 /* AgentDevinHookTests.swift */; };
+		PR1000000000000000000001 /* AgentInteractionParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PR2000000000000000000001 /* AgentInteractionParityTests.swift */; };
+		DP1000000000000000000001 /* AgentDiskProviderSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DP2000000000000000000001 /* AgentDiskProviderSessionTests.swift */; };
+		A10000000000000000000078 /* ClaudeStatusBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000078 /* ClaudeStatusBridge.swift */; };
+		A10000000000000000000079 /* ClaudeStatusBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000079 /* ClaudeStatusBridgeTests.swift */; };
+		A10000000000000000000080 /* AgentUsageAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000080 /* AgentUsageAdapterTests.swift */; };
+		A1000000000000000000000A /* Nano.app in Embed App */ = {isa = PBXBuildFile; fileRef = A30000000000000000000001 /* Nano.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A1000000000000000000000B /* MotionComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* MotionComponents.swift */; };
+		A1000000000000000000000C /* FocusTimerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* FocusTimerStore.swift */; };
+		A1000000000000000000000E /* TrayStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* TrayStore.swift */; };
+		RL1000000000000000000001 /* NanoRelease.swift in Sources */ = {isa = PBXBuildFile; fileRef = RL2000000000000000000001 /* NanoRelease.swift */; };
+		A1000000000000000000000F /* IslandModuleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* IslandModuleViews.swift */; };
+		A10000000000000000000010 /* CalendarWeatherServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* CalendarWeatherServices.swift */; };
+		A10000000000000000000011 /* CameraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* CameraService.swift */; };
+		A10000000000000000000030 /* AgentTokenTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* AgentTokenTypes.swift */; };
+		A10000000000000000000035 /* AgentHookBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* AgentHookBridge.swift */; };
+		E5C0DE100000000000000001 /* CodexHookTrust.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5C0DE200000000000000001 /* CodexHookTrust.swift */; };
+		E5C0DE100000000000000002 /* CodexHookTrustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5C0DE200000000000000002 /* CodexHookTrustTests.swift */; };
+		A10000000000000000000099 /* AgentRoutesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000099 /* AgentRoutesTests.swift */; };
+		A10000000000000000000100 /* AgentUsageBatch2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000100 /* AgentUsageBatch2Tests.swift */; };
+		A10000000000000000000031 /* AgentUsageAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* AgentUsageAdapters.swift */; };
+		A10000000000000000000032 /* TokenLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* TokenLedger.swift */; };
+		A10000000000000000000033 /* ModelPricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* ModelPricing.swift */; };
+		A10000000000000000000034 /* AgentSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* AgentSessionStore.swift */; };
+		A10000000000000000000086 /* AgentSessionJump.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000086 /* AgentSessionJump.swift */; };
+		A10000000000000000000088 /* AgentProviderAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000088 /* AgentProviderAdapter.swift */; };
+		OB10000000000000000000001 /* NanoOnboardingPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = OB20000000000000000000001 /* NanoOnboardingPlan.swift */; };
+		A10000000000000000000089 /* NanoModuleRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000089 /* NanoModuleRegistry.swift */; };
+		A10000000000000000000012 /* MediaSystemServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* MediaSystemServices.swift */; };
+		M10000000000000000000001 /* MediaKeyInterceptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = M20000000000000000000001 /* MediaKeyInterceptor.swift */; };
+		M10000000000000000000003 /* AgentRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = M20000000000000000000003 /* AgentRoutes.swift */; };
+		M10000000000000000000002 /* MediaKeyInterceptorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = M20000000000000000000002 /* MediaKeyInterceptorTests.swift */; };
+		A10000000000000000000013 /* AgentStatusService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* AgentStatusService.swift */; };
+		A10000000000000000000015 /* UtilityModuleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* UtilityModuleViews.swift */; };
+		A10000000000000000000016 /* ConnectedModuleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* ConnectedModuleViews.swift */; };
+		A10000000000000000000081 /* IslandNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000081 /* IslandNotification.swift */; };
+		A10000000000000000000082 /* SystemEventMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000082 /* SystemEventMonitor.swift */; };
+		A10000000000000000000094 /* NotificationCenterStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000094 /* NotificationCenterStore.swift */; };
+		A10000000000000000000095 /* SystemNotificationServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000095 /* SystemNotificationServices.swift */; };
+		A10000000000000000000084 /* IslandNotificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000084 /* IslandNotificationView.swift */; };
+		A10000000000000000000085 /* IslandNotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000085 /* IslandNotificationTests.swift */; };
+		A10000000000000000000090 /* BluetoothDeviceModelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000090 /* BluetoothDeviceModelView.swift */; };
+		B30000000000000000000000 /* agent-claude.png in Resources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000000 /* agent-claude.png */; };
+		B30000000000000000000001 /* agent-codex.png in Resources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000001 /* agent-codex.png */; };
+		B30000000000000000000002 /* agent-cursor.png in Resources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000002 /* agent-cursor.png */; };
+		B30000000000000000000004 /* agent-kimi.png in Resources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000004 /* agent-kimi.png */; };
+		B30000000000000000000005 /* agent-gemini.png in Resources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000005 /* agent-gemini.png */; };
+		B30000000000000000000006 /* agent-grok.png in Resources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000006 /* agent-grok.png */; };
+		B30000000000000000000007 /* agent-opencode.png in Resources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000007 /* agent-opencode.png */; };
+		B30000000000000000000008 /* agent-pi.png in Resources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000008 /* agent-pi.png */; };
+		B50000000000000000000009 /* agent-devin.png in Resources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000009 /* agent-devin.png */; };
+		B5000000000000000000000A /* agent-cline.png in Resources */ = {isa = PBXBuildFile; fileRef = B6000000000000000000000A /* agent-cline.png */; };
+		B5000000000000000000000B /* agent-qwen.png in Resources */ = {isa = PBXBuildFile; fileRef = B6000000000000000000000B /* agent-qwen.png */; };
+		B5000000000000000000000C /* agent-kilo.png in Resources */ = {isa = PBXBuildFile; fileRef = B6000000000000000000000C /* agent-kilo.png */; };
+		B5000000000000000000000D /* agent-goose.png in Resources */ = {isa = PBXBuildFile; fileRef = B6000000000000000000000D /* agent-goose.png */; };
+		D1000000000000000000000001 /* VoiceDictationTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000001 /* VoiceDictationTypes.swift */; };
+		D1000000000000000000000002 /* VoiceDictationModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000002 /* VoiceDictationModelStore.swift */; };
+		D1000000000000000000000003 /* VoiceDictationModelManifest+Files.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000003 /* VoiceDictationModelManifest+Files.swift */; };
+		D1000000000000000000000004 /* VoiceDictationTextPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000004 /* VoiceDictationTextPipeline.swift */; };
+		D1000000000000000000000005 /* VoiceDictationHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000005 /* VoiceDictationHistoryStore.swift */; };
+		D1000000000000000000000006 /* VoiceDictationAudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000006 /* VoiceDictationAudioRecorder.swift */; };
+		D1000000000000000000000007 /* VoiceDictationHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000007 /* VoiceDictationHotkeyMonitor.swift */; };
+		D1000000000000000000000008 /* VoiceDictationEngines.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000008 /* VoiceDictationEngines.swift */; };
+		D1000000000000000000000009 /* WhisperCppRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000009 /* WhisperCppRecognizer.swift */; };
+		DB100000000000000000000004 /* VoiceDictationStatsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB200000000000000000000004 /* VoiceDictationStatsStore.swift */; };
+		D100000000000000000000000A /* ParakeetRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D200000000000000000000000A /* ParakeetRecognizer.swift */; };
+		QL1000000000000000000000001 /* CohereRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = QL2000000000000000000000001 /* CohereRecognizer.swift */; };
+		QL1000000000000000000000002 /* VoiceDictationFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = QL2000000000000000000000002 /* VoiceDictationFormatting.swift */; };
+		SK1000000000000000000000001 /* VoiceDictationSketchOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = SK2000000000000000000000001 /* VoiceDictationSketchOutput.swift */; };
+		SK1000000000000000000000002 /* VoiceDictationSketchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = SK2000000000000000000000002 /* VoiceDictationSketchSession.swift */; };
+		SK1000000000000000000000003 /* silero-vad-unified-256ms-v6.2.1.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = SK2000000000000000000000003 /* silero-vad-unified-256ms-v6.2.1.mlmodelc */; };
+		SK1000000000000000000000004 /* VoiceDictationVAD.swift in Sources */ = {isa = PBXBuildFile; fileRef = SK2000000000000000000000004 /* VoiceDictationVAD.swift */; };
+		SK1000000000000000000000006 /* VoiceDictationSketchRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = SK2000000000000000000000006 /* VoiceDictationSketchRecorder.swift */; };
+		QL1000000000000000000000003 /* VoiceDictationCorrectionLearner.swift in Sources */ = {isa = PBXBuildFile; fileRef = QL2000000000000000000000003 /* VoiceDictationCorrectionLearner.swift */; };
+		QL1000000000000000000000004 /* VoiceDictationRemoteControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = QL2000000000000000000000004 /* VoiceDictationRemoteControl.swift */; };
+		QL1000000000000000000000005 /* VoiceDictationQuillTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QL2000000000000000000000005 /* VoiceDictationQuillTests.swift */; };
+		QL1000000000000000000000006 /* VoiceDictationAccuracyBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = QL2000000000000000000000006 /* VoiceDictationAccuracyBenchmark.swift */; };
+		D100000000000000000000000B /* S1MiniCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D200000000000000000000000B /* S1MiniCleaner.swift */; };
+		D100000000000000000000000D /* VoiceDictationTranscriptChunker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D200000000000000000000000D /* VoiceDictationTranscriptChunker.swift */; };
+		D100000000000000000000000E /* VoiceDictationCleanupGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D200000000000000000000000E /* VoiceDictationCleanupGuard.swift */; };
+		D100000000000000000000000C /* VoiceDictationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D200000000000000000000000C /* VoiceDictationController.swift */; };
+		SK1000000000000000000000005 /* VoiceDictationAppPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = SK2000000000000000000000005 /* VoiceDictationAppPicker.swift */; };
+		D1000000000000000000000010 /* VoiceDictationSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000010 /* VoiceDictationSettingsPane.swift */; };
+		D1000000000000000000000011 /* VoiceDictationIslandViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000011 /* VoiceDictationIslandViews.swift */; };
+		CU100000000000000000000001 /* CueStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CU200000000000000000000001 /* CueStore.swift */; };
+		CS100000000000000000000B /* cue-sync.md in Resources */ = {isa = PBXBuildFile; fileRef = CS200000000000000000000B /* cue-sync.md */; };
+		CS100000000000000000000A /* MCPOAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = CS200000000000000000000A /* MCPOAuth.swift */; };
+		CS1000000000000000000009 /* TodoistDestinationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CS2000000000000000000009 /* TodoistDestinationTests.swift */; };
+		CS1000000000000000000008 /* TodoistDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = CS2000000000000000000008 /* TodoistDestination.swift */; };
+		CS1000000000000000000007 /* MCPTaskDestinationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CS2000000000000000000007 /* MCPTaskDestinationTests.swift */; };
+		CS1000000000000000000006 /* MCPTaskDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = CS2000000000000000000006 /* MCPTaskDestination.swift */; };
+		CS1000000000000000000005 /* CueSyncSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = CS2000000000000000000005 /* CueSyncSettingsTab.swift */; };
+		CS1000000000000000000004 /* RemindersDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = CS2000000000000000000004 /* RemindersDestination.swift */; };
+		CS1000000000000000000001 /* TaskDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = CS2000000000000000000001 /* TaskDestination.swift */; };
+		CS1000000000000000000002 /* CueSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = CS2000000000000000000002 /* CueSyncEngine.swift */; };
+		CS1000000000000000000003 /* CueSyncEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CS2000000000000000000003 /* CueSyncEngineTests.swift */; };
+		CU100000000000000000000002 /* CueViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CU200000000000000000000002 /* CueViews.swift */; };
+		DB100000000000000000000001 /* DashboardWidgetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB200000000000000000000001 /* DashboardWidgetViews.swift */; };
+		DB100000000000000000000002 /* DashboardEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB200000000000000000000002 /* DashboardEditorView.swift */; };
+		DB100000000000000000000003 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB200000000000000000000003 /* SettingsComponents.swift */; };
+		CU100000000000000000000003 /* CueSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = CU200000000000000000000003 /* CueSettingsPane.swift */; };
+		CU100000000000000000000004 /* CueStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CU200000000000000000000004 /* CueStoreTests.swift */; };
+		N1000000000000000000000013 /* QuickCaptureHotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = N2000000000000000000000013 /* QuickCaptureHotkey.swift */; };
+		D1000000000000000000000020 /* VoiceDictationPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000020 /* VoiceDictationPipelineTests.swift */; };
+		D1000000000000000000000026 /* VoiceDictationCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000026 /* VoiceDictationCleanupTests.swift */; };
+		D1000000000000000000000027 /* VoiceDictationCleanupEval.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000027 /* VoiceDictationCleanupEval.swift */; };
+		D1000000000000000000000021 /* VoiceDictationHistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000021 /* VoiceDictationHistoryStoreTests.swift */; };
+		D1000000000000000000000022 /* VoiceDictationModelStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000022 /* VoiceDictationModelStoreTests.swift */; };
+		D1000000000000000000000023 /* VoiceDictationSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000023 /* VoiceDictationSettingsTests.swift */; };
+		D1000000000000000000000024 /* VoiceDictationControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000024 /* VoiceDictationControllerTests.swift */; };
+		D5000000000000000000000003 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = D5000000000000000000000002 /* FluidAudio */; };
+		D5000000000000000000000013 /* WhisperRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = D5000000000000000000000012 /* WhisperRuntime */; };
+		D5000000000000000000000023 /* LlamaRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = D5000000000000000000000022 /* LlamaRuntime */; };
+		D1000000000000000000000025 /* VoiceDictationBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000000000000000000000025 /* VoiceDictationBenchmark.swift */; };
+		E10000000000000000000001 /* DeviceAnimations in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* DeviceAnimations */; };
+		F10000000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* Assets.xcassets */; };
+		F10000000000000000000002 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* AppIcon.icon */; };
+		MX10000000000000000000001 /* MixerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = MX20000000000000000000001 /* MixerEngine.swift */; };
+		MX10000000000000000000002 /* MixerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = MX20000000000000000000002 /* MixerStore.swift */; };
+		MX10000000000000000000003 /* MixerViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = MX20000000000000000000003 /* MixerViews.swift */; };
+		MX10000000000000000000004 /* MixerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MX20000000000000000000004 /* MixerTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A40000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A50000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A60000000000000000000001;
+			remoteInfo = Nano;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A70000000000000000000001 /* Embed App */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 16;
+			files = (
+				A1000000000000000000000A /* Nano.app in Embed App */,
+			);
+			name = "Embed App";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		AF2000000000000000000001 /* NotificationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationRouter.swift; sourceTree = "<group>"; };
+		BF0000000000000000000002 /* nano-opencode-plugin.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "Plugins/nano-opencode-plugin.js"; sourceTree = "<group>"; };
+		BF0000000000000000000015 /* nano-pi-extension.ts */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.typescript; path = "Plugins/nano-pi-extension.ts"; sourceTree = "<group>"; };
+		BF0000000000000000000011 /* nano-cursor-jump-package.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "Plugins/nano-cursor-jump-package.json"; sourceTree = "<group>"; };
+		BF0000000000000000000013 /* nano-cursor-jump-extension.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "Plugins/nano-cursor-jump-extension.js"; sourceTree = "<group>"; };
+		A20000000000000000000001 /* NanoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* NanoAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoAppDelegate.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* IslandState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandState.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* NanoSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoSettings.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* IslandPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandPanel.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* IslandRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandRootView.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* NanoMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoMark.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* NanoSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoSettingsView.swift; sourceTree = "<group>"; };
+		A20000000000000000000092 /* SettingsHoverIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsHoverIcons.swift; sourceTree = "<group>"; };
+		A20000000000000000000093 /* NanoSettingsPermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoSettingsPermissions.swift; sourceTree = "<group>"; };
+		A20000000000000000000096 /* NanoSetupChecklistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoSetupChecklistView.swift; sourceTree = "<group>"; };
+		0B20000000000000000000A1 /* OnboardingIslandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingIslandView.swift; sourceTree = "<group>"; };
+		0B20000000000000000000A2 /* OnboardingFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlow.swift; sourceTree = "<group>"; };
+		0B20000000000000000000A3 /* OnboardingExperienceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingExperienceView.swift; sourceTree = "<group>"; };
+		0B20000000000000000000A4 /* OnboardingStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStage.swift; sourceTree = "<group>"; };
+		0B40000000000000000000A1 /* Onboarding */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Onboarding; sourceTree = "<group>"; };
+		A20000000000000000000097 /* NanoOnboardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoOnboardingTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* IslandStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandStateTests.swift; sourceTree = "<group>"; };
+		DB200000000000000000000005 /* SettingsWindowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowUITests.swift; sourceTree = "<group>"; };
+		M20000000000000000000001 /* MediaKeyInterceptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaKeyInterceptor.swift; sourceTree = "<group>"; };
+		M20000000000000000000003 /* AgentRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRoutes.swift; sourceTree = "<group>"; };
+		M20000000000000000000002 /* MediaKeyInterceptorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaKeyInterceptorTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000040 /* TokenLedgerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenLedgerTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000077 /* AgentHookUninstallTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentHookUninstallTests.swift; sourceTree = "<group>"; };
+		DV2000000000000000000001 /* AgentDevinHookTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDevinHookTests.swift; sourceTree = "<group>"; };
+		PR2000000000000000000001 /* AgentInteractionParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentInteractionParityTests.swift; sourceTree = "<group>"; };
+		DP2000000000000000000001 /* AgentDiskProviderSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDiskProviderSessionTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000078 /* ClaudeStatusBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatusBridge.swift; sourceTree = "<group>"; };
+		A20000000000000000000079 /* ClaudeStatusBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatusBridgeTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000080 /* AgentUsageAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentUsageAdapterTests.swift; sourceTree = "<group>"; };
+		A2000000000000000000000A /* MotionComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionComponents.swift; sourceTree = "<group>"; };
+		A2000000000000000000000B /* FocusTimerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusTimerStore.swift; sourceTree = "<group>"; };
+		A2000000000000000000000D /* TrayStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrayStore.swift; sourceTree = "<group>"; };
+		RL2000000000000000000001 /* NanoRelease.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoRelease.swift; sourceTree = "<group>"; };
+		A2000000000000000000000E /* IslandModuleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandModuleViews.swift; sourceTree = "<group>"; };
+		A2000000000000000000000F /* CalendarWeatherServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarWeatherServices.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* CameraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraService.swift; sourceTree = "<group>"; };
+		A20000000000000000000030 /* AgentTokenTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTokenTypes.swift; sourceTree = "<group>"; };
+		A20000000000000000000035 /* AgentHookBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentHookBridge.swift; sourceTree = "<group>"; };
+		E5C0DE200000000000000001 /* CodexHookTrust.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexHookTrust.swift; sourceTree = "<group>"; };
+		E5C0DE200000000000000002 /* CodexHookTrustTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexHookTrustTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000099 /* AgentRoutesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRoutesTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000100 /* AgentUsageBatch2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentUsageBatch2Tests.swift; sourceTree = "<group>"; };
+		A20000000000000000000031 /* AgentUsageAdapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentUsageAdapters.swift; sourceTree = "<group>"; };
+		A20000000000000000000032 /* TokenLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenLedger.swift; sourceTree = "<group>"; };
+		A20000000000000000000033 /* ModelPricing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPricing.swift; sourceTree = "<group>"; };
+		A20000000000000000000034 /* AgentSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionStore.swift; sourceTree = "<group>"; };
+		A20000000000000000000086 /* AgentSessionJump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionJump.swift; sourceTree = "<group>"; };
+		A20000000000000000000088 /* AgentProviderAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProviderAdapter.swift; sourceTree = "<group>"; };
+		OB20000000000000000000001 /* NanoOnboardingPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoOnboardingPlan.swift; sourceTree = "<group>"; };
+		A20000000000000000000089 /* NanoModuleRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoModuleRegistry.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* MediaSystemServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSystemServices.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* AgentStatusService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStatusService.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* Nano.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Nano.entitlements; sourceTree = "<group>"; };
+		A20000000000000000000015 /* UtilityModuleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UtilityModuleViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* ConnectedModuleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectedModuleViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000081 /* IslandNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandNotification.swift; sourceTree = "<group>"; };
+		A20000000000000000000082 /* SystemEventMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemEventMonitor.swift; sourceTree = "<group>"; };
+		A20000000000000000000094 /* NotificationCenterStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationCenterStore.swift; sourceTree = "<group>"; };
+		A20000000000000000000095 /* SystemNotificationServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemNotificationServices.swift; sourceTree = "<group>"; };
+		A20000000000000000000084 /* IslandNotificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandNotificationView.swift; sourceTree = "<group>"; };
+		A20000000000000000000085 /* IslandNotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandNotificationTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000090 /* BluetoothDeviceModelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothDeviceModelView.swift; sourceTree = "<group>"; };
+		B40000000000000000000000 /* agent-claude.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-claude.png; sourceTree = "<group>"; };
+		B40000000000000000000001 /* agent-codex.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-codex.png; sourceTree = "<group>"; };
+		B40000000000000000000002 /* agent-cursor.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-cursor.png; sourceTree = "<group>"; };
+		B40000000000000000000004 /* agent-kimi.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-kimi.png; sourceTree = "<group>"; };
+		B40000000000000000000005 /* agent-gemini.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-gemini.png; sourceTree = "<group>"; };
+		B40000000000000000000006 /* agent-grok.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-grok.png; sourceTree = "<group>"; };
+		B40000000000000000000007 /* agent-opencode.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-opencode.png; sourceTree = "<group>"; };
+		B40000000000000000000008 /* agent-pi.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-pi.png; sourceTree = "<group>"; };
+		B60000000000000000000009 /* agent-devin.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-devin.png; sourceTree = "<group>"; };
+		B6000000000000000000000A /* agent-cline.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-cline.png; sourceTree = "<group>"; };
+		B6000000000000000000000B /* agent-qwen.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-qwen.png; sourceTree = "<group>"; };
+		B6000000000000000000000C /* agent-kilo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-kilo.png; sourceTree = "<group>"; };
+		B6000000000000000000000D /* agent-goose.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = agent-goose.png; sourceTree = "<group>"; };
+		A30000000000000000000001 /* Nano.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nano.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A30000000000000000000002 /* NanoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NanoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D2000000000000000000000001 /* VoiceDictationTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationTypes.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000002 /* VoiceDictationModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationModelStore.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000003 /* VoiceDictationModelManifest+Files.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationModelManifest+Files.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000004 /* VoiceDictationTextPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationTextPipeline.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000005 /* VoiceDictationHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationHistoryStore.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000006 /* VoiceDictationAudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationAudioRecorder.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000007 /* VoiceDictationHotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationHotkeyMonitor.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000008 /* VoiceDictationEngines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationEngines.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000009 /* WhisperCppRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WhisperCppRecognizer.swift"; sourceTree = "<group>"; };
+		DB200000000000000000000004 /* VoiceDictationStatsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceDictationStatsStore.swift; sourceTree = "<group>"; };
+		D200000000000000000000000A /* ParakeetRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ParakeetRecognizer.swift"; sourceTree = "<group>"; };
+		QL2000000000000000000000001 /* CohereRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CohereRecognizer.swift"; sourceTree = "<group>"; };
+		QL2000000000000000000000002 /* VoiceDictationFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationFormatting.swift"; sourceTree = "<group>"; };
+		SK2000000000000000000000001 /* VoiceDictationSketchOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationSketchOutput.swift"; sourceTree = "<group>"; };
+		SK2000000000000000000000002 /* VoiceDictationSketchSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationSketchSession.swift"; sourceTree = "<group>"; };
+		SK2000000000000000000000003 /* silero-vad-unified-256ms-v6.2.1.mlmodelc */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Models/silero-vad-unified-256ms-v6.2.1.mlmodelc"; sourceTree = "<group>"; };
+		SK2000000000000000000000004 /* VoiceDictationVAD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationVAD.swift"; sourceTree = "<group>"; };
+		SK2000000000000000000000006 /* VoiceDictationSketchRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationSketchRecorder.swift"; sourceTree = "<group>"; };
+		QL2000000000000000000000003 /* VoiceDictationCorrectionLearner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationCorrectionLearner.swift"; sourceTree = "<group>"; };
+		QL2000000000000000000000004 /* VoiceDictationRemoteControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationRemoteControl.swift"; sourceTree = "<group>"; };
+		QL2000000000000000000000005 /* VoiceDictationQuillTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationQuillTests.swift"; sourceTree = "<group>"; };
+		QL2000000000000000000000006 /* VoiceDictationAccuracyBenchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationAccuracyBenchmark.swift"; sourceTree = "<group>"; };
+		QL2000000000000000000000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D200000000000000000000000B /* S1MiniCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "S1MiniCleaner.swift"; sourceTree = "<group>"; };
+		D200000000000000000000000D /* VoiceDictationTranscriptChunker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationTranscriptChunker.swift"; sourceTree = "<group>"; };
+		D200000000000000000000000E /* VoiceDictationCleanupGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationCleanupGuard.swift"; sourceTree = "<group>"; };
+		D200000000000000000000000C /* VoiceDictationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationController.swift"; sourceTree = "<group>"; };
+		SK2000000000000000000000005 /* VoiceDictationAppPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationAppPicker.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000010 /* VoiceDictationSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationSettingsPane.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000011 /* VoiceDictationIslandViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationIslandViews.swift"; sourceTree = "<group>"; };
+		CU200000000000000000000001 /* CueStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueStore.swift; sourceTree = "<group>"; };
+		CS200000000000000000000B /* cue-sync.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = "cue-sync.md"; path = "docs/cue-sync.md"; sourceTree = "<group>"; };
+		CS200000000000000000000A /* MCPOAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPOAuth.swift; sourceTree = "<group>"; };
+		CS2000000000000000000009 /* TodoistDestinationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoistDestinationTests.swift; sourceTree = "<group>"; };
+		CS2000000000000000000008 /* TodoistDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoistDestination.swift; sourceTree = "<group>"; };
+		CS2000000000000000000007 /* MCPTaskDestinationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPTaskDestinationTests.swift; sourceTree = "<group>"; };
+		CS2000000000000000000006 /* MCPTaskDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPTaskDestination.swift; sourceTree = "<group>"; };
+		CS2000000000000000000005 /* CueSyncSettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueSyncSettingsTab.swift; sourceTree = "<group>"; };
+		CS2000000000000000000004 /* RemindersDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersDestination.swift; sourceTree = "<group>"; };
+		CS2000000000000000000001 /* TaskDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDestination.swift; sourceTree = "<group>"; };
+		CS2000000000000000000002 /* CueSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueSyncEngine.swift; sourceTree = "<group>"; };
+		CS2000000000000000000003 /* CueSyncEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueSyncEngineTests.swift; sourceTree = "<group>"; };
+		CU200000000000000000000002 /* CueViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueViews.swift; sourceTree = "<group>"; };
+		DB200000000000000000000001 /* DashboardWidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWidgetViews.swift; sourceTree = "<group>"; };
+		DB200000000000000000000002 /* DashboardEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardEditorView.swift; sourceTree = "<group>"; };
+		DB200000000000000000000003 /* SettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComponents.swift; sourceTree = "<group>"; };
+		CU200000000000000000000003 /* CueSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueSettingsPane.swift; sourceTree = "<group>"; };
+		CU200000000000000000000004 /* CueStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueStoreTests.swift; sourceTree = "<group>"; };
+		N2000000000000000000000013 /* QuickCaptureHotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCaptureHotkey.swift; sourceTree = "<group>"; };
+		D2000000000000000000000020 /* VoiceDictationPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationPipelineTests.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000026 /* VoiceDictationCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationCleanupTests.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000027 /* VoiceDictationCleanupEval.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationCleanupEval.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000021 /* VoiceDictationHistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationHistoryStoreTests.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000022 /* VoiceDictationModelStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationModelStoreTests.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000023 /* VoiceDictationSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationSettingsTests.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000024 /* VoiceDictationControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationControllerTests.swift"; sourceTree = "<group>"; };
+		D2000000000000000000000025 /* VoiceDictationBenchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VoiceDictationBenchmark.swift"; sourceTree = "<group>"; };
+		E20000000000000000000001 /* DeviceAnimations */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DeviceAnimations; sourceTree = "<group>"; };
+		F20000000000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F20000000000000000000002 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		MX20000000000000000000001 /* MixerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixerEngine.swift; sourceTree = "<group>"; };
+		MX20000000000000000000002 /* MixerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixerStore.swift; sourceTree = "<group>"; };
+		MX20000000000000000000003 /* MixerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixerViews.swift; sourceTree = "<group>"; };
+		MX20000000000000000000004 /* MixerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixerTests.swift; sourceTree = "<group>"; };
+		SG20000000000000000000001 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A80000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (D5000000000000000000000003 /* FluidAudio in Frameworks */, D5000000000000000000000013 /* WhisperRuntime in Frameworks */, D5000000000000000000000023 /* LlamaRuntime in Frameworks */, ); runOnlyForDeploymentPostprocessing = 0; };
+		A80000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A90000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A90000000000000000000002 /* Nano */,
+				A90000000000000000000007 /* NanoTests */,
+				A90000000000000000000008 /* Products */,
+				SG90000000000000000000001 /* Config */,
+				CS200000000000000000000B /* cue-sync.md */,
+			);
+			sourceTree = "<group>";
+		};
+		SG90000000000000000000001 /* Config */ = {isa = PBXGroup; children = (SG20000000000000000000001 /* Signing.xcconfig */, ); path = Config; sourceTree = "<group>"; };
+		A90000000000000000000002 /* Nano */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* NanoApp.swift */,
+				QL2000000000000000000000007 /* Info.plist */,
+				F20000000000000000000001 /* Assets.xcassets */,
+				F20000000000000000000002 /* AppIcon.icon */,
+				A20000000000000000000014 /* Nano.entitlements */,
+				A90000000000000000000003 /* App */,
+				A90000000000000000000004 /* Core */,
+				A90000000000000000000005 /* Window */,
+				A90000000000000000000006 /* Views */,
+				A90000000000000000000009 /* Resources */,
+			);
+			path = Nano;
+			sourceTree = "<group>";
+		};
+		A90000000000000000000003 /* App */ = {isa = PBXGroup; children = (A20000000000000000000002 /* NanoAppDelegate.swift */, ); path = App; sourceTree = "<group>"; };
+		A90000000000000000000004 /* Core */ = {isa = PBXGroup; children = (MX20000000000000000000002 /* MixerStore.swift */, MX20000000000000000000001 /* MixerEngine.swift */, A20000000000000000000003 /* IslandState.swift */, A20000000000000000000004 /* NanoSettings.swift */, A20000000000000000000089 /* NanoModuleRegistry.swift */, OB20000000000000000000001 /* NanoOnboardingPlan.swift */, A2000000000000000000000B /* FocusTimerStore.swift */, N2000000000000000000000013 /* QuickCaptureHotkey.swift */, CU200000000000000000000001 /* CueStore.swift */, CS2000000000000000000001 /* TaskDestination.swift */, CS2000000000000000000002 /* CueSyncEngine.swift */, CS2000000000000000000004 /* RemindersDestination.swift */, CS2000000000000000000006 /* MCPTaskDestination.swift */, CS200000000000000000000A /* MCPOAuth.swift */, CS2000000000000000000008 /* TodoistDestination.swift */, A2000000000000000000000D /* TrayStore.swift */, RL2000000000000000000001 /* NanoRelease.swift */, A2000000000000000000000F /* CalendarWeatherServices.swift */, A20000000000000000000010 /* CameraService.swift */, A20000000000000000000011 /* MediaSystemServices.swift */, A20000000000000000000012 /* AgentStatusService.swift */, A20000000000000000000030 /* AgentTokenTypes.swift */, A20000000000000000000031 /* AgentUsageAdapters.swift */, A20000000000000000000032 /* TokenLedger.swift */, A20000000000000000000033 /* ModelPricing.swift */, A20000000000000000000034 /* AgentSessionStore.swift */, A20000000000000000000086 /* AgentSessionJump.swift */, A20000000000000000000088 /* AgentProviderAdapter.swift */, A20000000000000000000035 /* AgentHookBridge.swift */, E5C0DE200000000000000001 /* CodexHookTrust.swift */, A20000000000000000000078 /* ClaudeStatusBridge.swift */, A20000000000000000000081 /* IslandNotification.swift */, A20000000000000000000082 /* SystemEventMonitor.swift */, A20000000000000000000094 /* NotificationCenterStore.swift */, A20000000000000000000095 /* SystemNotificationServices.swift */, AF2000000000000000000001 /* NotificationRouter.swift */, M20000000000000000000001 /* MediaKeyInterceptor.swift */, M20000000000000000000003 /* AgentRoutes.swift */, D7000000000000000000000001 /* VoiceDictation */, ); path = Core; sourceTree = "<group>"; };
+		A90000000000000000000005 /* Window */ = {isa = PBXGroup; children = (A20000000000000000000005 /* IslandPanel.swift */, 0B20000000000000000000A4 /* OnboardingStage.swift */, ); path = Window; sourceTree = "<group>"; };
+		A90000000000000000000006 /* Views */ = {isa = PBXGroup; children = (MX20000000000000000000003 /* MixerViews.swift */, A20000000000000000000006 /* IslandRootView.swift */, A20000000000000000000007 /* NanoMark.swift */, A20000000000000000000008 /* NanoSettingsView.swift */, A20000000000000000000096 /* NanoSetupChecklistView.swift */, 0B20000000000000000000A1 /* OnboardingIslandView.swift */, 0B20000000000000000000A2 /* OnboardingFlow.swift */, 0B20000000000000000000A3 /* OnboardingExperienceView.swift */, A20000000000000000000092 /* SettingsHoverIcons.swift */, A20000000000000000000093 /* NanoSettingsPermissions.swift */, A2000000000000000000000A /* MotionComponents.swift */, A2000000000000000000000E /* IslandModuleViews.swift */, A20000000000000000000015 /* UtilityModuleViews.swift */, A20000000000000000000016 /* ConnectedModuleViews.swift */, A20000000000000000000084 /* IslandNotificationView.swift */, A20000000000000000000090 /* BluetoothDeviceModelView.swift */, D2000000000000000000000010 /* VoiceDictationSettingsPane.swift */, SK2000000000000000000000005 /* VoiceDictationAppPicker.swift */, D2000000000000000000000011 /* VoiceDictationIslandViews.swift */, CU200000000000000000000002 /* CueViews.swift */, CU200000000000000000000003 /* CueSettingsPane.swift */, CS2000000000000000000005 /* CueSyncSettingsTab.swift */, DB200000000000000000000001 /* DashboardWidgetViews.swift */, DB200000000000000000000002 /* DashboardEditorView.swift */, DB200000000000000000000003 /* SettingsComponents.swift */, ); path = Views; sourceTree = "<group>"; };
+		A90000000000000000000007 /* NanoTests */ = {isa = PBXGroup; children = (MX20000000000000000000004 /* MixerTests.swift */, A20000000000000000000009 /* IslandStateTests.swift */, A20000000000000000000040 /* TokenLedgerTests.swift */, A20000000000000000000077 /* AgentHookUninstallTests.swift */, DV2000000000000000000001 /* AgentDevinHookTests.swift */, PR2000000000000000000001 /* AgentInteractionParityTests.swift */, DP2000000000000000000001 /* AgentDiskProviderSessionTests.swift */, E5C0DE200000000000000002 /* CodexHookTrustTests.swift */, A20000000000000000000099 /* AgentRoutesTests.swift */, A20000000000000000000079 /* ClaudeStatusBridgeTests.swift */, A20000000000000000000080 /* AgentUsageAdapterTests.swift */, A20000000000000000000100 /* AgentUsageBatch2Tests.swift */, A20000000000000000000085 /* IslandNotificationTests.swift */, A20000000000000000000097 /* NanoOnboardingTests.swift */, D2000000000000000000000020 /* VoiceDictationPipelineTests.swift */, D2000000000000000000000026 /* VoiceDictationCleanupTests.swift */, D2000000000000000000000027 /* VoiceDictationCleanupEval.swift */, D2000000000000000000000021 /* VoiceDictationHistoryStoreTests.swift */, D2000000000000000000000022 /* VoiceDictationModelStoreTests.swift */, D2000000000000000000000023 /* VoiceDictationSettingsTests.swift */, D2000000000000000000000024 /* VoiceDictationControllerTests.swift */, D2000000000000000000000025 /* VoiceDictationBenchmark.swift */, QL2000000000000000000000005 /* VoiceDictationQuillTests.swift */, QL2000000000000000000000006 /* VoiceDictationAccuracyBenchmark.swift */, CU200000000000000000000004 /* CueStoreTests.swift */, CS2000000000000000000003 /* CueSyncEngineTests.swift */, CS2000000000000000000007 /* MCPTaskDestinationTests.swift */, CS2000000000000000000009 /* TodoistDestinationTests.swift */, M20000000000000000000002 /* MediaKeyInterceptorTests.swift */, DB200000000000000000000005 /* SettingsWindowUITests.swift */, ); path = NanoTests; sourceTree = "<group>"; };
+		A90000000000000000000008 /* Products */ = {isa = PBXGroup; children = (A30000000000000000000001 /* Nano.app */, A30000000000000000000002 /* NanoTests.xctest */, ); name = Products; sourceTree = "<group>"; };
+		A90000000000000000000009 /* Resources */ = {isa = PBXGroup; children = ( A9000000000000000000000B /* AgentIcons */, E20000000000000000000001 /* DeviceAnimations */, 0B40000000000000000000A1 /* Onboarding */, BF0000000000000000000002 /* nano-opencode-plugin.js */, BF0000000000000000000015 /* nano-pi-extension.ts */, BF0000000000000000000011 /* nano-cursor-jump-package.json */, BF0000000000000000000013 /* nano-cursor-jump-extension.js */, SK2000000000000000000000003 /* silero-vad-unified-256ms-v6.2.1.mlmodelc */, ); path = Resources; sourceTree = "<group>"; };
+		A9000000000000000000000B /* AgentIcons */ = {isa = PBXGroup; children = (B40000000000000000000000 /* agent-claude.png */, B40000000000000000000001 /* agent-codex.png */, B40000000000000000000002 /* agent-cursor.png */, B40000000000000000000004 /* agent-kimi.png */, B40000000000000000000005 /* agent-gemini.png */, B40000000000000000000006 /* agent-grok.png */, B40000000000000000000007 /* agent-opencode.png */, B40000000000000000000008 /* agent-pi.png */, B60000000000000000000009 /* agent-devin.png */, B6000000000000000000000A /* agent-cline.png */, B6000000000000000000000B /* agent-qwen.png */, B6000000000000000000000C /* agent-kilo.png */, B6000000000000000000000D /* agent-goose.png */, ); path = AgentIcons; sourceTree = "<group>"; };
+		D7000000000000000000000001 /* VoiceDictation */ = {isa = PBXGroup; children = (D2000000000000000000000001 /* VoiceDictationTypes.swift */, D2000000000000000000000002 /* VoiceDictationModelStore.swift */, D2000000000000000000000003 /* VoiceDictationModelManifest+Files.swift */, D2000000000000000000000004 /* VoiceDictationTextPipeline.swift */, D2000000000000000000000005 /* VoiceDictationHistoryStore.swift */, DB200000000000000000000004 /* VoiceDictationStatsStore.swift */, D2000000000000000000000006 /* VoiceDictationAudioRecorder.swift */, D2000000000000000000000007 /* VoiceDictationHotkeyMonitor.swift */, D2000000000000000000000008 /* VoiceDictationEngines.swift */, D2000000000000000000000009 /* WhisperCppRecognizer.swift */, D200000000000000000000000A /* ParakeetRecognizer.swift */, D200000000000000000000000B /* S1MiniCleaner.swift */, D200000000000000000000000D /* VoiceDictationTranscriptChunker.swift */, D200000000000000000000000E /* VoiceDictationCleanupGuard.swift */, D200000000000000000000000C /* VoiceDictationController.swift */, QL2000000000000000000000001 /* CohereRecognizer.swift */, QL2000000000000000000000002 /* VoiceDictationFormatting.swift */, QL2000000000000000000000003 /* VoiceDictationCorrectionLearner.swift */, QL2000000000000000000000004 /* VoiceDictationRemoteControl.swift */, SK2000000000000000000000001 /* VoiceDictationSketchOutput.swift */, SK2000000000000000000000002 /* VoiceDictationSketchSession.swift */, SK2000000000000000000000004 /* VoiceDictationVAD.swift */, SK2000000000000000000000006 /* VoiceDictationSketchRecorder.swift */, ); path = VoiceDictation; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A60000000000000000000001 /* Nano */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000001 /* Build configuration list for PBXNativeTarget "Nano" */;
+			buildPhases = (AF0000000000000000000001 /* Validate signing identity */, AB0000000000000000000001 /* Sources */, A80000000000000000000001 /* Frameworks */, AC0000000000000000000001 /* Resources */, AF0000000000000000000002 /* Embed complete AppIcon */, );
+			buildRules = ();
+			dependencies = ();
+			name = Nano;
+			packageProductDependencies = (D5000000000000000000000002 /* FluidAudio */, D5000000000000000000000012 /* WhisperRuntime */, D5000000000000000000000022 /* LlamaRuntime */, );
+			productName = Nano;
+			productReference = A30000000000000000000001 /* Nano.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A60000000000000000000002 /* NanoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000002 /* Build configuration list for PBXNativeTarget "NanoTests" */;
+			buildPhases = (AB0000000000000000000002 /* Sources */, A80000000000000000000002 /* Frameworks */, AC0000000000000000000002 /* Resources */, A70000000000000000000001 /* Embed App */, );
+			buildRules = ();
+			dependencies = (AD0000000000000000000001 /* PBXTargetDependency */, );
+			name = NanoTests;
+			productName = NanoTests;
+			productReference = A30000000000000000000002 /* NanoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A50000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					A60000000000000000000001 = {CreatedOnToolsVersion = 26.6; };
+					A60000000000000000000002 = {CreatedOnToolsVersion = 26.6; TestTargetID = A60000000000000000000001; };
+				};
+			};
+			buildConfigurationList = AA0000000000000000000003 /* Build configuration list for PBXProject "Nano" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base, );
+			mainGroup = A90000000000000000000001;
+			packageReferences = (D5000000000000000000000001 /* XCLocalSwiftPackageReference "Nano/Packages/FluidAudio" */, D5000000000000000000000011 /* XCLocalSwiftPackageReference "Nano/Packages/NanoSpeechRuntimes" */, );
+			productRefGroup = A90000000000000000000008 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (A60000000000000000000001 /* Nano */, A60000000000000000000002 /* NanoTests */, );
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AC0000000000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (SK1000000000000000000000003 /* silero-vad-unified-256ms-v6.2.1.mlmodelc in Resources */, F10000000000000000000001 /* Assets.xcassets in Resources */, F10000000000000000000002 /* AppIcon.icon in Resources */, E10000000000000000000001 /* DeviceAnimations in Resources */, 0B30000000000000000000A1 /* Onboarding in Resources */, BF0000000000000000000001 /* nano-opencode-plugin.js in Resources */, BF0000000000000000000014 /* nano-pi-extension.ts in Resources */, BF0000000000000000000010 /* nano-cursor-jump-package.json in Resources */, BF0000000000000000000012 /* nano-cursor-jump-extension.js in Resources */, B30000000000000000000000 /* agent-claude.png in Resources */, B30000000000000000000001 /* agent-codex.png in Resources */, B30000000000000000000002 /* agent-cursor.png in Resources */, B30000000000000000000004 /* agent-kimi.png in Resources */, B30000000000000000000005 /* agent-gemini.png in Resources */, B30000000000000000000006 /* agent-grok.png in Resources */, B30000000000000000000007 /* agent-opencode.png in Resources */, B30000000000000000000008 /* agent-pi.png in Resources */, B50000000000000000000009 /* agent-devin.png in Resources */, B5000000000000000000000A /* agent-cline.png in Resources */, B5000000000000000000000B /* agent-qwen.png in Resources */, B5000000000000000000000C /* agent-kilo.png in Resources */, B5000000000000000000000D /* agent-goose.png in Resources */, CS100000000000000000000B /* cue-sync.md in Resources */, ); runOnlyForDeploymentPostprocessing = 0; };
+		AC0000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AF0000000000000000000001 /* Validate signing identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ("$(SRCROOT)/tools/validate-build-identity.sh", );
+			name = "Validate signing identity";
+			outputPaths = ();
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$SRCROOT/tools/validate-build-identity.sh\"";
+		};
+		AF0000000000000000000002 /* Embed complete AppIcon */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ("$(SRCROOT)/tools/embed-complete-app-icon.sh", "$(SRCROOT)/Nano/Assets.xcassets/AppIcon.appiconset", );
+			name = "Embed complete AppIcon";
+			outputPaths = ("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/AppIcon.icns", );
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$SRCROOT/tools/embed-complete-app-icon.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AB0000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* NanoApp.swift in Sources */,
+				A10000000000000000000002 /* NanoAppDelegate.swift in Sources */,
+				A10000000000000000000003 /* IslandState.swift in Sources */,
+				A10000000000000000000004 /* NanoSettings.swift in Sources */,
+				A10000000000000000000005 /* IslandPanel.swift in Sources */,
+				A10000000000000000000006 /* IslandRootView.swift in Sources */,
+				A10000000000000000000007 /* NanoMark.swift in Sources */,
+				A10000000000000000000008 /* NanoSettingsView.swift in Sources */,
+				A10000000000000000000092 /* SettingsHoverIcons.swift in Sources */,
+				A10000000000000000000093 /* NanoSettingsPermissions.swift in Sources */,
+				A10000000000000000000096 /* NanoSetupChecklistView.swift in Sources */,
+				0B10000000000000000000A1 /* OnboardingIslandView.swift in Sources */,
+				0B10000000000000000000A2 /* OnboardingFlow.swift in Sources */,
+				0B10000000000000000000A3 /* OnboardingExperienceView.swift in Sources */,
+				0B10000000000000000000A4 /* OnboardingStage.swift in Sources */,
+				A1000000000000000000000B /* MotionComponents.swift in Sources */,
+				A1000000000000000000000C /* FocusTimerStore.swift in Sources */,
+				A1000000000000000000000E /* TrayStore.swift in Sources */,
+				RL1000000000000000000001 /* NanoRelease.swift in Sources */,
+				A1000000000000000000000F /* IslandModuleViews.swift in Sources */,
+				A10000000000000000000010 /* CalendarWeatherServices.swift in Sources */,
+				A10000000000000000000011 /* CameraService.swift in Sources */,
+				A10000000000000000000030 /* AgentTokenTypes.swift in Sources */,
+				A10000000000000000000035 /* AgentHookBridge.swift in Sources */,
+				E5C0DE100000000000000001 /* CodexHookTrust.swift in Sources */,
+				A10000000000000000000088 /* AgentProviderAdapter.swift in Sources */,
+				A10000000000000000000089 /* NanoModuleRegistry.swift in Sources */,
+				OB10000000000000000000001 /* NanoOnboardingPlan.swift in Sources */,
+				A10000000000000000000078 /* ClaudeStatusBridge.swift in Sources */,
+				A10000000000000000000031 /* AgentUsageAdapters.swift in Sources */,
+				A10000000000000000000032 /* TokenLedger.swift in Sources */,
+				A10000000000000000000033 /* ModelPricing.swift in Sources */,
+				A10000000000000000000034 /* AgentSessionStore.swift in Sources */,
+				A10000000000000000000086 /* AgentSessionJump.swift in Sources */,
+				A10000000000000000000012 /* MediaSystemServices.swift in Sources */,
+				A10000000000000000000013 /* AgentStatusService.swift in Sources */,
+				A10000000000000000000015 /* UtilityModuleViews.swift in Sources */,
+				A10000000000000000000016 /* ConnectedModuleViews.swift in Sources */,
+				A10000000000000000000081 /* IslandNotification.swift in Sources */,
+				A10000000000000000000082 /* SystemEventMonitor.swift in Sources */,
+				A10000000000000000000094 /* NotificationCenterStore.swift in Sources */,
+				A10000000000000000000095 /* SystemNotificationServices.swift in Sources */,
+                AF1000000000000000000001 /* NotificationRouter.swift in Sources */,
+				A10000000000000000000084 /* IslandNotificationView.swift in Sources */,
+				A10000000000000000000090 /* BluetoothDeviceModelView.swift in Sources */,
+				D1000000000000000000000001 /* VoiceDictationTypes.swift in Sources */,
+				D1000000000000000000000002 /* VoiceDictationModelStore.swift in Sources */,
+				D1000000000000000000000003 /* VoiceDictationModelManifest+Files.swift in Sources */,
+				D1000000000000000000000004 /* VoiceDictationTextPipeline.swift in Sources */,
+				D1000000000000000000000005 /* VoiceDictationHistoryStore.swift in Sources */,
+				D1000000000000000000000006 /* VoiceDictationAudioRecorder.swift in Sources */,
+				D1000000000000000000000007 /* VoiceDictationHotkeyMonitor.swift in Sources */,
+				D1000000000000000000000008 /* VoiceDictationEngines.swift in Sources */,
+				D1000000000000000000000009 /* WhisperCppRecognizer.swift in Sources */,
+				DB100000000000000000000004 /* VoiceDictationStatsStore.swift in Sources */,
+				D100000000000000000000000A /* ParakeetRecognizer.swift in Sources */,
+				D100000000000000000000000B /* S1MiniCleaner.swift in Sources */,
+				QL1000000000000000000000001 /* CohereRecognizer.swift in Sources */,
+				QL1000000000000000000000002 /* VoiceDictationFormatting.swift in Sources */,
+				QL1000000000000000000000003 /* VoiceDictationCorrectionLearner.swift in Sources */,
+				SK1000000000000000000000001 /* VoiceDictationSketchOutput.swift in Sources */,
+				SK1000000000000000000000002 /* VoiceDictationSketchSession.swift in Sources */,
+				SK1000000000000000000000004 /* VoiceDictationVAD.swift in Sources */,
+				SK1000000000000000000000006 /* VoiceDictationSketchRecorder.swift in Sources */,
+				QL1000000000000000000000004 /* VoiceDictationRemoteControl.swift in Sources */,
+				D100000000000000000000000D /* VoiceDictationTranscriptChunker.swift in Sources */,
+				D100000000000000000000000E /* VoiceDictationCleanupGuard.swift in Sources */,
+				D100000000000000000000000C /* VoiceDictationController.swift in Sources */,
+				D1000000000000000000000010 /* VoiceDictationSettingsPane.swift in Sources */,
+				SK1000000000000000000000005 /* VoiceDictationAppPicker.swift in Sources */,
+				D1000000000000000000000011 /* VoiceDictationIslandViews.swift in Sources */,
+				CU100000000000000000000001 /* CueStore.swift in Sources */,
+				CS100000000000000000000A /* MCPOAuth.swift in Sources */,
+				CS1000000000000000000008 /* TodoistDestination.swift in Sources */,
+				CS1000000000000000000006 /* MCPTaskDestination.swift in Sources */,
+				CS1000000000000000000005 /* CueSyncSettingsTab.swift in Sources */,
+				CS1000000000000000000004 /* RemindersDestination.swift in Sources */,
+				CS1000000000000000000001 /* TaskDestination.swift in Sources */,
+				CS1000000000000000000002 /* CueSyncEngine.swift in Sources */,
+				MX10000000000000000000002 /* MixerStore.swift in Sources */,
+				MX10000000000000000000001 /* MixerEngine.swift in Sources */,
+				CU100000000000000000000002 /* CueViews.swift in Sources */,
+				MX10000000000000000000003 /* MixerViews.swift in Sources */,
+				DB100000000000000000000001 /* DashboardWidgetViews.swift in Sources */,
+				DB100000000000000000000002 /* DashboardEditorView.swift in Sources */,
+				DB100000000000000000000003 /* SettingsComponents.swift in Sources */,
+				CU100000000000000000000003 /* CueSettingsPane.swift in Sources */,
+				N1000000000000000000000013 /* QuickCaptureHotkey.swift in Sources */,
+				M10000000000000000000001 /* MediaKeyInterceptor.swift in Sources */,
+				M10000000000000000000003 /* AgentRoutes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AB0000000000000000000002 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (MX10000000000000000000004 /* MixerTests.swift in Sources */, A10000000000000000000009 /* IslandStateTests.swift in Sources */, A10000000000000000000040 /* TokenLedgerTests.swift in Sources */, A10000000000000000000077 /* AgentHookUninstallTests.swift in Sources */, DV1000000000000000000001 /* AgentDevinHookTests.swift in Sources */, PR1000000000000000000001 /* AgentInteractionParityTests.swift in Sources */, DP1000000000000000000001 /* AgentDiskProviderSessionTests.swift in Sources */, E5C0DE100000000000000002 /* CodexHookTrustTests.swift in Sources */, A10000000000000000000099 /* AgentRoutesTests.swift in Sources */, A10000000000000000000079 /* ClaudeStatusBridgeTests.swift in Sources */, A10000000000000000000080 /* AgentUsageAdapterTests.swift in Sources */, A10000000000000000000100 /* AgentUsageBatch2Tests.swift in Sources */, A10000000000000000000085 /* IslandNotificationTests.swift in Sources */, A10000000000000000000097 /* NanoOnboardingTests.swift in Sources */, D1000000000000000000000020 /* VoiceDictationPipelineTests.swift in Sources */, D1000000000000000000000026 /* VoiceDictationCleanupTests.swift in Sources */, D1000000000000000000000027 /* VoiceDictationCleanupEval.swift in Sources */, D1000000000000000000000021 /* VoiceDictationHistoryStoreTests.swift in Sources */, D1000000000000000000000022 /* VoiceDictationModelStoreTests.swift in Sources */, D1000000000000000000000023 /* VoiceDictationSettingsTests.swift in Sources */, D1000000000000000000000024 /* VoiceDictationControllerTests.swift in Sources */, D1000000000000000000000025 /* VoiceDictationBenchmark.swift in Sources */, QL1000000000000000000000005 /* VoiceDictationQuillTests.swift in Sources */, QL1000000000000000000000006 /* VoiceDictationAccuracyBenchmark.swift in Sources */, CU100000000000000000000004 /* CueStoreTests.swift in Sources */, CS1000000000000000000003 /* CueSyncEngineTests.swift in Sources */, CS1000000000000000000007 /* MCPTaskDestinationTests.swift in Sources */, CS1000000000000000000009 /* TodoistDestinationTests.swift in Sources */, M10000000000000000000002 /* MediaKeyInterceptorTests.swift in Sources */, DB100000000000000000000005 /* SettingsWindowUITests.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AD0000000000000000000001 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = A60000000000000000000001 /* Nano */; targetProxy = A40000000000000000000001 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		AE0000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AE0000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		AE0000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = SG20000000000000000000001 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_ENTITLEMENTS = Nano/NanoLocal.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = NO;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Nano/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Nano;
+				INFOPLIST_KEY_CFBundleIconName = AppIcon;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_LSUIElement = NO;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Nano controls Music, Spotify, Cursor, and T3 Code when you jump to a session or use Music Control.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Nano announces when AirPods, mice, keyboards, and other Bluetooth accessories connect or disconnect.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Nano shows your upcoming calendar events in the island.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Nano syncs Cue to-dos with the Reminders lists you link.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Nano shows a private live camera preview that is never recorded.";
+				INFOPLIST_KEY_NSContactsUsageDescription = "Nano shows the sender's contact photo on iMessage notification cards.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Nano reads your location to show local weather in the island.";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Nano reads your location to show local weather in the island.";
+				INFOPLIST_KEY_NSLocationUsageDescription = "Nano reads your location to show local weather in the island.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Nano reads your location to show local weather in the island.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Nano listens only while your Quill dictation shortcut is active and transcribes on this Mac. Audio is never stored or sent anywhere.";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nanoapp.Nano;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		AE0000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "arm64 x86_64";
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = Nano/Nano.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Nano/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Nano;
+				INFOPLIST_KEY_CFBundleIconName = AppIcon;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_LSUIElement = NO;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Nano controls Music, Spotify, Cursor, and T3 Code when you jump to a session or use Music Control.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Nano announces when AirPods, mice, keyboards, and other Bluetooth accessories connect or disconnect.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Nano shows your upcoming calendar events in the island.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Nano syncs Cue to-dos with the Reminders lists you link.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Nano shows a private live camera preview that is never recorded.";
+				INFOPLIST_KEY_NSContactsUsageDescription = "Nano shows the sender's contact photo on iMessage notification cards.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Nano reads your location to show local weather in the island.";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Nano reads your location to show local weather in the island.";
+				INFOPLIST_KEY_NSLocationUsageDescription = "Nano reads your location to show local weather in the island.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Nano reads your location to show local weather in the island.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Nano listens only while your Quill dictation shortcut is active and transcribes on this Mac. Audio is never stored or sent anywhere.";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nanoapp.Nano;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		AE0000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nanoapp.NanoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Nano.app/Contents/MacOS/Nano";
+			};
+			name = Debug;
+		};
+		AE0000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nanoapp.NanoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Nano.app/Contents/MacOS/Nano";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AA0000000000000000000001 /* Build configuration list for PBXNativeTarget "Nano" */ = {isa = XCConfigurationList; buildConfigurations = (AE0000000000000000000003 /* Debug */, AE0000000000000000000004 /* Release */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		AA0000000000000000000002 /* Build configuration list for PBXNativeTarget "NanoTests" */ = {isa = XCConfigurationList; buildConfigurations = (AE0000000000000000000005 /* Debug */, AE0000000000000000000006 /* Release */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		AA0000000000000000000003 /* Build configuration list for PBXProject "Nano" */ = {isa = XCConfigurationList; buildConfigurations = (AE0000000000000000000001 /* Debug */, AE0000000000000000000002 /* Release */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+/* Begin XCLocalSwiftPackageReference section */
+		D5000000000000000000000001 /* XCLocalSwiftPackageReference "Nano/Packages/FluidAudio" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Nano/Packages/FluidAudio;
+		};
+		D5000000000000000000000011 /* XCLocalSwiftPackageReference "Nano/Packages/NanoSpeechRuntimes" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Nano/Packages/NanoSpeechRuntimes;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D5000000000000000000000002 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D5000000000000000000000001 /* XCLocalSwiftPackageReference "Nano/Packages/FluidAudio" */;
+			productName = FluidAudio;
+		};
+		D5000000000000000000000012 /* WhisperRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D5000000000000000000000011 /* XCLocalSwiftPackageReference "Nano/Packages/NanoSpeechRuntimes" */;
+			productName = WhisperRuntime;
+		};
+		D5000000000000000000000022 /* LlamaRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D5000000000000000000000011 /* XCLocalSwiftPackageReference "Nano/Packages/NanoSpeechRuntimes" */;
+			productName = LlamaRuntime;
+		};
+/* End XCSwiftPackageProductDependency section */
+
+	};
+	rootObject = A50000000000000000000001 /* Project object */;
+}

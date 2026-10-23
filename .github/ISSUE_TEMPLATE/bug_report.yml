@@ -1,0 +1,100 @@
+name: "Bug report"
+description: "Something in Nano isn't working"
+title: "[Bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Report a Bug** in Nano's menu bar menu or in Settings → Privacy & About fills in the two versions for you.
+
+  - type: input
+    id: version
+    attributes:
+      label: "Nano version"
+      description: "Settings → Privacy & About"
+      placeholder: "e.g. 0.1.0 (1)"
+    validations:
+      required: true
+
+  - type: input
+    id: macos-version
+    attributes:
+      label: "macOS version"
+      placeholder: "e.g. macOS 26.1 (25B78)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: "Where"
+      options:
+        - Island or dashboard
+        - Agents
+        - Music
+        - Tray
+        - Cue
+        - Quill (dictation)
+        - Notifications
+        - Calendar, weather, timer, or camera
+        - Settings or setup
+        - Something else
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent
+    attributes:
+      label: "Agent (if it's about agents)"
+      options:
+        - Not about agents
+        - Claude Code
+        - Codex
+        - Cursor
+        - Gemini CLI
+        - OpenCode
+        - Kimi
+        - Pi
+        - Grok
+        - Devin
+        - Several
+    validations:
+      required: false
+
+  - type: dropdown
+    id: display
+    attributes:
+      label: "Display"
+      options:
+        - MacBook with a notch
+        - Display without a notch
+        - Several displays
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "What happened?"
+      placeholder: "When I…, I expected…, but instead…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to reproduce"
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: false
+
+  - type: textarea
+    id: media
+    attributes:
+      label: "Screenshots or recordings"
+      description: "Drag them in. A short screen recording helps most with island behaviour."
+    validations:
+      required: false

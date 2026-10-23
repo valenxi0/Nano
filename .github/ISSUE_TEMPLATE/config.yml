@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Download Nano
+    url: https://github.com/valenxi0/Nano/releases/latest
+    about: The latest release, as a signed and notarized DMG.
+  - name: Website
+    url: https://trynano.app
+    about: What Nano does, with screenshots.
