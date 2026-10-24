@@ -53,6 +53,14 @@ Everything runs on your Mac. No account, no analytics, no ads.
 
 ## Install
 
+With [Homebrew](https://brew.sh):
+
+```sh
+brew install --cask valenxi0/tap/nano
+```
+
+Or download it yourself:
+
 1. Download the latest `Nano-x.y.z.dmg` from
    [Releases](https://github.com/valenxi0/Nano/releases/latest).
 2. Open it and drag Nano to Applications.
