@@ -1,6 +1,6 @@
 https://github.com/user-attachments/assets/6c8c8702-e811-45f7-b42f-e2fe8030c3ae
 
-<h1 align="center"><img src="docs/images/nano-icon.png" width="40" height="40" align="center" alt=""> Nano</h1>
+<h1 align="center"><img src="docs/images/nano-icon.png" width="40" height="40" align="top" alt=""> Nano</h1>
 
 <p align="center">
   The notch, put to work. A free, open source island for your Mac.
