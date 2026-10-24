@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="docs/images/nano-icon.png" width="128" alt="Nano">
-</p>
+https://github.com/user-attachments/assets/6c8c8702-e811-45f7-b42f-e2fe8030c3ae
 
 <h1 align="center">Nano</h1>
 
