@@ -1,0 +1,16 @@
+# Tells the website repo to rebuild whenever a release changes, so the
+# changelog, version badge and download links on trynano.app stay current.
+name: Rebuild website
+
+on:
+  release:
+    types: [published, edited, deleted]
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask valenxi0/trynano.app to redeploy
+        env:
+          GH_TOKEN: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
+        run: gh api repos/valenxi0/trynano.app/dispatches -f event_type=nano-release
