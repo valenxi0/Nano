@@ -1387,6 +1387,15 @@ final class IslandStateTests: XCTestCase {
         XCTAssertTrue(AgentSessionStore.isHostHousekeepingPrompt(
             "  Generate a title that will help the user recognize this T3 Code thread weeks later."
         ))
+        var branch = AgentSession(id: "branch", provider: .codex, projectName: "Nano", lastActivityAt: Date())
+        branch.offer("You generate concise git branch names.", from: .client)
+        XCTAssertTrue(AgentSessionStore.isHostHousekeeping(branch))
+        XCTAssertTrue(AgentSessionStore.isHostHousekeepingPrompt(
+            "You write concise git commit messages.\nReturn a JSON object with keys: subject, body."
+        ))
+        XCTAssertTrue(AgentSessionStore.isHostHousekeepingPrompt(
+            "You write source control change request content.\nBase branch: main"
+        ))
 
         XCTAssertTrue(AgentHookBridge.isHostInjectedPrompt("<task-notification>\n<task-id>1</task-id>"))
         XCTAssertTrue(AgentHookBridge.isHostInjectedPrompt("[SYSTEM NOTIFICATION - NOT USER INPUT]"))

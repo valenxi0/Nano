@@ -1438,17 +1438,26 @@ final class AgentSessionStore: ObservableObject {
         AgentSessionDismissals.save(dismissals, to: dismissalsURL)
     }
 
-    /// T3 names each thread by running a one-shot agent with this prompt. It
-    /// is the host's own chore, not a session the user started or can open.
+    /// T3 names threads and branches and writes commit messages and PR text by
+    /// running a one-shot agent with one of these prompts (its
+    /// `textGenerationPrompts.ts`). Those are the host's own chores, not
+    /// sessions the user started or can open.
     nonisolated static func isHostHousekeeping(_ session: AgentSession) -> Bool {
         if session.lastUserPrompt.map(isHostHousekeepingPrompt) == true { return true }
         return session.title.map { isHostHousekeepingPrompt($0.text) } == true
             || isHostHousekeepingPrompt(session.displayName)
     }
 
+    nonisolated static let hostHousekeepingPrompts = [
+        "Generate a title that will help the user recognize this T3 Code thread",
+        "You generate concise git branch names.",
+        "You write concise git commit messages.",
+        "You write source control change request content.",
+    ]
+
     nonisolated static func isHostHousekeepingPrompt(_ text: String) -> Bool {
-        text.trimmingCharacters(in: .whitespacesAndNewlines)
-            .hasPrefix("Generate a title that will help the user recognize this T3 Code thread")
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return hostHousekeepingPrompts.contains { text.hasPrefix($0) }
     }
 
     private func isDismissed(_ session: AgentSession) -> Bool {
