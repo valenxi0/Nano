@@ -64,12 +64,254 @@ struct AgentActivityEntry: Identifiable, Equatable, Sendable {
     }
 }
 
+/// The project a working folder belongs to. A git worktree (T3's, Conductor's,
+/// `git worktree add`) is named after its main repository, which git records
+/// in the worktree's `.git` file, so every tool that makes one resolves alike.
+enum AgentProjectFolder {
+    struct Resolved: Equatable, Sendable {
+        let name: String
+        let isWorktree: Bool
+    }
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var cache: [String: Resolved?] = [:]
+
+    /// Nil when the folder is in no repository. Cached: a folder's repository
+    /// does not change while a session runs, and rows ask on every redraw.
+    static func resolve(_ directory: String) -> Resolved? {
+        if let cached = lock.withLock({ cache[directory] }) { return cached }
+        let resolved = lookUp(directory)
+        lock.withLock {
+            if cache.count > 500 { cache.removeAll() }
+            cache[directory] = resolved
+        }
+        return resolved
+    }
+
+    static func lookUp(_ directory: String, fileManager: FileManager = .default) -> Resolved? {
+        var folder = URL(fileURLWithPath: directory).standardizedFileURL
+        for _ in 0 ..< 24 {
+            let git = folder.appendingPathComponent(".git")
+            var isDirectory: ObjCBool = false
+            if fileManager.fileExists(atPath: git.path, isDirectory: &isDirectory) {
+                if isDirectory.boolValue {
+                    return Resolved(name: folder.lastPathComponent, isWorktree: false)
+                }
+                // A worktree's `.git` is a file: `gitdir: <repo>/.git/worktrees/<name>`.
+                let pointer = (try? String(contentsOf: git, encoding: .utf8)) ?? ""
+                if let line = pointer.split(separator: "\n").first(where: { $0.hasPrefix("gitdir:") }),
+                   let marker = line.range(of: "/.git/worktrees/") {
+                    let repository = line[line.index(line.startIndex, offsetBy: 7)..<marker.lowerBound]
+                        .trimmingCharacters(in: .whitespaces)
+                    let name = URL(fileURLWithPath: repository).lastPathComponent
+                    if !name.isEmpty { return Resolved(name: name, isWorktree: true) }
+                }
+                return Resolved(name: folder.lastPathComponent, isWorktree: false)
+            }
+            let parent = folder.deletingLastPathComponent()
+            if parent.path == folder.path { break }
+            folder = parent
+        }
+        return nil
+    }
+}
+
+/// One row of a session's Subagents section: a subagent the transcript
+/// records, or one that ran as a session of its own.
+struct AgentSubagentEntry: Identifiable, Equatable, Sendable {
+    enum Status: Equatable, Sendable { case working, needsYou, done, failed, stopped }
+
+    let id: String
+    let name: String
+    /// A model ID for session children, the role for transcript subagents.
+    let model: String?
+    let role: String?
+    let status: Status
+    let startedAt: Date?
+    let endedAt: Date?
+    /// Set for a subagent that is a session of its own, which can be opened.
+    let sessionID: String?
+
+    var isRunning: Bool { status == .working || status == .needsYou }
+
+    /// Transcript subagents first, then child sessions; each oldest first.
+    static func entries(for parent: AgentSession, children: [AgentSession]) -> [AgentSubagentEntry] {
+        let builtIn = parent.subagents.map { agent -> AgentSubagentEntry in
+            let status: Status = agent.failed ? .failed
+                : agent.stopped ? .stopped
+                : agent.finishedAt != nil ? .done
+                : agent.isRunning(parentActive: parent.isActive) ? .working : .stopped
+            return AgentSubagentEntry(
+                id: agent.id.uuidString,
+                name: agent.displayName,
+                model: nil,
+                role: agent.roleLabel,
+                status: status,
+                startedAt: agent.startedAt,
+                endedAt: agent.finishedAt,
+                sessionID: nil
+            )
+        }
+        let sessions = children.map { child -> AgentSubagentEntry in
+            let status: Status = child.needsAttention ? .needsYou
+                : child.isActive ? .working
+                : child.finishedAt != nil ? .done : .stopped
+            return AgentSubagentEntry(
+                id: child.id,
+                name: child.displayName,
+                model: child.model,
+                role: nil,
+                status: status,
+                startedAt: child.startedAt ?? child.turnStartedAt,
+                endedAt: status == .done ? child.finishedAt : child.lastActivityAt,
+                sessionID: child.id
+            )
+        }
+        return builtIn + sessions
+    }
+
+    /// "12m 04s" while it runs, "done 4m ago · 33m" after.
+    func timeLabel(now: Date = Date()) -> String? {
+        switch status {
+        case .working, .needsYou:
+            return startedAt.map { Self.duration(from: $0, to: now, padded: true) }
+        case .done, .failed, .stopped:
+            guard let endedAt else { return nil }
+            let age = AgentSession.age(since: endedAt, now: now)
+            let word = status == .done ? "done" : status == .failed ? "failed" : "stopped"
+            let when = age == "now" ? "\(word) just now" : "\(word) \(age) ago"
+            // A call that returned at once (a background launch, a refusal)
+            // has no run time worth printing.
+            guard let startedAt, endedAt.timeIntervalSince(startedAt) >= 1 else { return when }
+            return "\(when) \u{00B7} \(Self.duration(from: startedAt, to: endedAt, padded: false))"
+        }
+    }
+
+    /// "45s", "4m 12s", "1h 3m". `padded` keeps a ticking clock from jumping
+    /// width as the seconds roll over.
+    static func duration(from start: Date, to end: Date, padded: Bool) -> String {
+        let seconds = max(Int(end.timeIntervalSince(start)), 0)
+        if seconds < 60 { return "\(seconds)s" }
+        if seconds < 3600 {
+            let rest = seconds % 60
+            return "\(seconds / 60)m \(padded && rest < 10 ? "0" : "")\(rest)s"
+        }
+        return "\(seconds / 3600)h \((seconds % 3600) / 60)m"
+    }
+}
+
 /// A delegated subagent run.
 struct AgentSubagent: Identifiable, Equatable, Sendable {
     let id = UUID()
     /// `general-purpose`, `Explore`, and so on.
     let type: String
     let task: String
+    /// The tool call that started it, so its result can mark it finished.
+    var toolUseID: String? = nil
+    var startedAt: Date? = nil
+    var finishedAt: Date? = nil
+    var failed = false
+    /// Claude Code's agent ID, when hooks reported the subagent.
+    var agentID: String? = nil
+    /// Cancelled before it finished.
+    var stopped = false
+    /// Launched with `run_in_background`. Its tool call returns at once; a
+    /// `<task-notification>` reports when it actually ends.
+    var isBackground = false
+
+    /// A background run with no notification for this long is assumed lost
+    /// (its session was killed), not still working.
+    static let backgroundRunLimit: TimeInterval = 6 * 60 * 60
+
+    /// Whether it is still working. A foreground subagent runs inside its
+    /// parent's turn; a background one outlives it.
+    func isRunning(parentActive: Bool, now: Date = Date()) -> Bool {
+        guard finishedAt == nil, !failed, !stopped else { return false }
+        if parentActive { return true }
+        guard isBackground, let startedAt else { return false }
+        return now.timeIntervalSince(startedAt) < Self.backgroundRunLimit
+    }
+
+    /// Marks the subagents whose tool results appear in `content` finished.
+    static func complete(_ subagents: inout [AgentSubagent], from content: Any?, at: Date) {
+        guard !subagents.isEmpty, let blocks = content as? [[String: Any]] else { return }
+        for block in blocks where (block["type"] as? String) == "tool_result" {
+            guard let id = block["tool_use_id"] as? String,
+                  let index = subagents.lastIndex(where: { $0.toolUseID == id })
+            else { continue }
+            if resultText(block["content"]).hasPrefix("Async agent launched") {
+                subagents[index].isBackground = true
+                continue
+            }
+            subagents[index].finishedAt = at
+            subagents[index].failed = (block["is_error"] as? Bool) == true
+        }
+    }
+
+    /// Folds hook-reported subagents into those a transcript parse found. The
+    /// same subagent is matched by its tool call or agent ID; hooks only add
+    /// what the transcript has not recorded and never undo a finish.
+    static func merge(_ live: [AgentHookBridge.LiveSubagent], into subagents: inout [AgentSubagent]) -> Bool {
+        var changed = false
+        for agent in live {
+            if let index = subagents.firstIndex(where: {
+                ($0.agentID != nil && $0.agentID == agent.agentID)
+                    || ($0.toolUseID != nil && $0.toolUseID == agent.toolUseID)
+            }) {
+                var existing = subagents[index]
+                existing.agentID = agent.agentID
+                if existing.startedAt == nil { existing.startedAt = agent.startedAt }
+                if agent.isBackground { existing.isBackground = true }
+                if existing.finishedAt == nil, let finished = agent.finishedAt { existing.finishedAt = finished }
+                if existing != subagents[index] {
+                    subagents[index] = existing
+                    changed = true
+                }
+            } else {
+                subagents.append(AgentSubagent(
+                    type: agent.type,
+                    task: agent.description ?? "Delegated work",
+                    toolUseID: agent.toolUseID,
+                    startedAt: agent.startedAt,
+                    finishedAt: agent.finishedAt,
+                    agentID: agent.agentID,
+                    isBackground: agent.isBackground
+                ))
+                changed = true
+            }
+        }
+        return changed
+    }
+
+    /// Ends background subagents named in Claude Code's `<task-notification>`
+    /// blocks: `<tool-use-id>` is the launching call, `<status>` the outcome.
+    static func applyNotifications(in text: String, at: Date, to subagents: inout [AgentSubagent]) {
+        guard !subagents.isEmpty, text.contains("<task-notification>") else { return }
+        for block in text.components(separatedBy: "<task-notification>").dropFirst() {
+            guard let id = tag("tool-use-id", in: block),
+                  let index = subagents.lastIndex(where: { $0.toolUseID == id }),
+                  subagents[index].finishedAt == nil
+            else { continue }
+            let status = tag("status", in: block)?.lowercased() ?? "completed"
+            guard ["completed", "failed", "killed", "stopped", "cancelled"].contains(status) else { continue }
+            subagents[index].finishedAt = at
+            subagents[index].failed = status == "failed"
+            subagents[index].stopped = ["killed", "stopped", "cancelled"].contains(status)
+        }
+    }
+
+    private static func tag(_ name: String, in text: String) -> String? {
+        guard let open = text.range(of: "<\(name)>"),
+              let close = text.range(of: "</\(name)>", range: open.upperBound..<text.endIndex)
+        else { return nil }
+        return text[open.upperBound..<close.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func resultText(_ content: Any?) -> String {
+        if let text = content as? String { return text }
+        let blocks = content as? [[String: Any]] ?? []
+        return blocks.compactMap { $0["text"] as? String }.joined(separator: "\n")
+    }
 
     /// The work-shaped name shown in Nano. Some Codex hosts encrypt the
     /// delegated brief before it reaches the transcript, leaving a Fernet-like
@@ -208,6 +450,7 @@ enum AgentToolLabel {
             text = String(text[range.upperBound...])
                 .trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        text = withoutLeadingAssignments(text)
 
         if let marker = text.range(of: "<<") {
             let head = text[..<marker.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
@@ -227,6 +470,33 @@ enum AgentToolLabel {
             text = String(text[..<newline])
         }
         return text
+    }
+
+    /// Drops `NAME=value` prefixes (`R="/a long/path" cmd`, `X=1; cmd`), which
+    /// say nothing about what runs and can fill the whole label.
+    static func withoutLeadingAssignments(_ command: String) -> String {
+        var rest = Substring(command)
+        while let equals = rest.firstIndex(of: "="),
+              rest[..<equals].range(of: "^[A-Za-z_][A-Za-z0-9_]*$", options: .regularExpression) != nil {
+            var index = rest.index(after: equals)
+            var quote: Character?
+            while index < rest.endIndex {
+                let character = rest[index]
+                if let open = quote {
+                    if character == open { quote = nil }
+                } else if character == "\"" || character == "'" {
+                    quote = character
+                } else if character.isWhitespace || character == ";" {
+                    break
+                }
+                index = rest.index(after: index)
+            }
+            guard quote == nil else { return command }
+            rest = rest[index...].drop { $0.isWhitespace || $0 == ";" }
+            if rest.hasPrefix("&&") { rest = rest.dropFirst(2).drop(while: \.isWhitespace) }
+            if rest.isEmpty { return command }
+        }
+        return String(rest)
     }
 
     static func truncated(_ text: String, _ limit: Int) -> String {
@@ -393,6 +663,19 @@ struct AgentSession: Identifiable, Equatable, Sendable {
         if let lastUserPrompt, !lastUserPrompt.isEmpty { return lastUserPrompt }
         if let focusLabel, !focusLabel.isEmpty { return focusLabel }
         return "Session"
+    }
+
+    /// The project to show: the repository the working folder belongs to
+    /// (a worktree counts as its main repository), else the folder name.
+    /// Nil when that is only a generic folder such as the home directory.
+    var project: AgentProjectFolder.Resolved? {
+        if let directory = workingDirectory,
+           let resolved = AgentProjectFolder.resolve(directory),
+           Self.projectLabel(named: resolved.name, directory: nil) != nil {
+            return resolved
+        }
+        guard let label = Self.projectLabel(named: projectName, directory: workingDirectory) else { return nil }
+        return AgentProjectFolder.Resolved(name: label, isWorktree: false)
     }
 
     /// Folder label for a checkout, or nil when the path is just the home
@@ -574,6 +857,15 @@ struct AgentSession: Identifiable, Equatable, Sendable {
     /// knows through hooks; `displayedTurns` covers those.
     var conversation: [AgentConversationTurn] = []
     var subagents: [AgentSubagent] = []
+    /// The session that delegated this one, when it is a subagent that runs
+    /// as a session of its own.
+    var parentSessionID: String?
+    /// Filled in by the store for the list only: the parent's name on a child
+    /// that surfaced because it needs the user, and how many subagents this
+    /// session has (child sessions and built-in ones) and how many still work.
+    var parentTitle: String?
+    var subagentsWorking = 0
+    var subagentCount = 0
     var needsAttention = false
     var isActive = false
     /// The last permission answer sent from the island for this session.
@@ -640,6 +932,10 @@ struct AgentSession: Identifiable, Equatable, Sendable {
             && lhs.host == rhs.host
             && lhs.model == rhs.model
             && lhs.finishedAt == rhs.finishedAt
+            && lhs.parentSessionID == rhs.parentSessionID
+            && lhs.parentTitle == rhs.parentTitle
+            && lhs.subagentsWorking == rhs.subagentsWorking
+            && lhs.subagentCount == rhs.subagentCount
     }
 }
 
@@ -1009,12 +1305,17 @@ final class AgentSessionStore: ObservableObject {
     /// `focusLabel(for:)` for why it is held rather than recomputed.
     private var focusLabels: [String: String] = [:]
 
+    /// Child-to-parent links for subagents that run as sessions of their own.
+    private let subagentLinks: AgentSubagentLinks
+
     init(
         cursorMetadata: [String: AgentCursorConversationMetadata.Entry]? = nil,
-        dismissalsURL: URL? = AgentSessionDismissals.defaultURL
+        dismissalsURL: URL? = AgentSessionDismissals.defaultURL,
+        subagentLinks: AgentSubagentLinks = .shared
     ) {
         self.cursorMetadata = cursorMetadata ?? [:]
         self.dismissalsURL = dismissalsURL
+        self.subagentLinks = subagentLinks
         dismissals = AgentSessionDismissals.load(from: dismissalsURL)
         if let cursorMetadata {
             parserKnownTitles = AgentKnownTitles(cursor: cursorMetadata)
@@ -1155,9 +1456,55 @@ final class AgentSessionStore: ObservableObject {
         return session.lastActivityAt <= dismissedAt && !session.needsAttention
     }
 
+    // MARK: Subagent sessions
+
+    /// The session that delegated `session`, if Nano knows it.
+    func parentSession(of session: AgentSession) -> AgentSession? {
+        guard let parentID = session.parentSessionID ?? subagentLinks.parent(of: session.id),
+              parentID != session.id
+        else { return nil }
+        return sessions.first { $0.id == parentID }
+    }
+
+    /// Sessions `parentID` delegated, oldest first.
+    func childSessions(of parentID: String) -> [AgentSession] {
+        sessions
+            .filter { ($0.parentSessionID ?? subagentLinks.parent(of: $0.id)) == parentID && $0.id != parentID }
+            .sorted { ($0.startedAt ?? $0.lastActivityAt) < ($1.startedAt ?? $1.lastActivityAt) }
+    }
+
+    /// A child session folds into its parent's row. It keeps a row of its own
+    /// only while it needs the user, since a hidden approval is a trap, or
+    /// when its parent is not a session Nano knows.
     private func recentSessions(at now: Date) -> [AgentSession] {
+        var parentIDs: [String: String] = [:]
+        var children: [String: [AgentSession]] = [:]
+        let known = Set(sessions.map(\.id))
+        for session in sessions {
+            guard let parentID = session.parentSessionID ?? subagentLinks.parent(of: session.id),
+                  parentID != session.id, known.contains(parentID)
+            else { continue }
+            parentIDs[session.id] = parentID
+            children[parentID, default: []].append(session)
+        }
+        let decorated = sessions.compactMap { session -> AgentSession? in
+            var shown = session
+            if let parentID = parentIDs[session.id] {
+                guard session.needsAttention else { return nil }
+                shown.parentTitle = sessions.first { $0.id == parentID }?.displayName
+            }
+            // Separate child sessions and the agent's own built-in subagents
+            // count alike.
+            let own = children[session.id] ?? []
+            shown.subagentCount = own.count + session.subagents.count
+            shown.subagentsWorking = own.filter { $0.isActive || $0.needsAttention }.count
+                + session.subagents.filter { $0.isRunning(parentActive: session.isActive, now: now) }.count
+            return shown
+        }
         let cutoff = now.addingTimeInterval(-Self.lingerWindow)
-        let live = sessions.filter { session in
+        let live = decorated.filter { session in
+            // A parent waiting on its subagents is still in use.
+            if session.subagentsWorking > 0, !Self.isHostHousekeeping(session) { return true }
             let completionIsReviewable = completionReviewDeadlines[session.id].map { $0 >= now } == true
             let isVisible: Bool
             if let isOpenInClient = session.isOpenInClient {
@@ -1769,6 +2116,13 @@ final class AgentSessionStore: ObservableObject {
             session.lastAgentMessage = reply
             changed = true
         }
+        if let parent = state.parentSessionID, session.parentSessionID != parent {
+            session.parentSessionID = parent
+            changed = true
+        }
+        if !state.subagents.isEmpty, AgentSubagent.merge(state.subagents, into: &session.subagents) {
+            changed = true
+        }
         if let model = (session.provider == .cursor ? currentT3RuntimeIndex().exactEntry(sessionID: session.id)?.model
             ?? CursorConversationModels.model(for: session.id) : nil) ?? state.model, session.model != model {
             session.model = model
@@ -1813,6 +2167,8 @@ final class AgentSessionStore: ObservableObject {
         built.lastUserPrompt = state.lastUserPrompt.map(Self.firstDisplayLine)
         built.turnStartedAt = state.turnStartedAt
         built.lastAgentMessage = state.lastAgentMessage
+        built.parentSessionID = state.parentSessionID
+        _ = AgentSubagent.merge(state.subagents, into: &built.subagents)
 
         if !state.recentActivity.isEmpty {
             built.recentActivity = state.recentActivity
@@ -4897,6 +5253,12 @@ enum AgentSessionParsers {
                 // transcript. It is the person's chosen name, not an AI title.
                 session.offer(object["customTitle"] as? String, from: .userNamed)
                 continue
+            case "queue-operation":
+                // Background subagents report their end here first.
+                if let text = object["content"] as? String {
+                    AgentSubagent.applyNotifications(in: text, at: at, to: &session.subagents)
+                }
+                continue
             case "session_info":
                 // Pi `/name` stores the display name as a session_info entry.
                 session.offer(object["name"] as? String, from: .userNamed)
@@ -5006,7 +5368,8 @@ enum AgentSessionParsers {
             if let plan = planText(from: payload["content"]) {
                 session.plan = plan
             }
-            session.subagents.append(contentsOf: subagents(from: payload["content"]))
+            session.subagents.append(contentsOf: subagents(from: payload["content"], at: at))
+            AgentSubagent.complete(&session.subagents, from: payload["content"], at: at)
             let changes = fileChanges(from: payload["content"])
             session.linesAdded += changes.reduce(0) { $0 + $1.added }
             session.linesRemoved += changes.reduce(0) { $0 + $1.removed }
@@ -5440,7 +5803,7 @@ enum AgentSessionParsers {
 
     /// The subagent tool is `Agent` in this harness and `Task` in others; both
     /// carry the same `subagent_type` and `description`.
-    private static func subagents(from content: Any?) -> [AgentSubagent] {
+    private static func subagents(from content: Any?, at: Date) -> [AgentSubagent] {
         guard let blocks = content as? [[String: Any]] else { return [] }
         return blocks.compactMap { block in
             guard (block["type"] as? String) == "tool_use",
@@ -5450,7 +5813,10 @@ enum AgentSessionParsers {
             else { return nil }
             return AgentSubagent(
                 type: (input["subagent_type"] as? String) ?? "agent",
-                task: (input["description"] as? String) ?? "Delegated work"
+                task: (input["description"] as? String) ?? "Delegated work",
+                toolUseID: block["id"] as? String,
+                startedAt: at,
+                isBackground: (input["run_in_background"] as? Bool) == true
             )
         }
     }
@@ -5530,12 +5896,23 @@ enum AgentSessionParsers {
     /// Harness-injected messages arrive with `role: "user"` but are not things
     /// the user typed. Taking the last user message verbatim meant a background
     /// build notification outranked the actual question on screen.
+    /// Claude Code's note on a screenshot it scaled down, sent as its own text
+    /// block ahead of what the user typed.
+    private static func isImageNote(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.hasPrefix("[Image: original ") && trimmed.hasSuffix("]") && !trimmed.contains("\n")
+    }
+
     private static func isSynthetic(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("<") , trimmed.contains(">") { return true }
         if trimmed.compare("[Image]", options: .caseInsensitive) == .orderedSame {
             return true
         }
+        // Claude Code's reply when a deferred tool's schema is loaded. It is
+        // the harness talking, not the user.
+        if trimmed == "Tool loaded." { return true }
+        if isImageNote(trimmed) { return true }
         for marker in [
             "[SYSTEM NOTIFICATION", "Caveat:", "<system-reminder>",
             "<task-notification>", "<command-name>", "<local-command",
@@ -5554,7 +5931,7 @@ enum AgentSessionParsers {
             guard type == "text" || type == "input_text" || type == "output_text" else {
                 continue
             }
-            if let text = block["text"] as? String { return text }
+            if let text = block["text"] as? String, !isImageNote(text) { return text }
         }
         return nil
     }

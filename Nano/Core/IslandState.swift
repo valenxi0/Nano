@@ -571,12 +571,12 @@ final class IslandViewModel: ObservableObject {
             // Until the first measurement lands, a middling height avoids a
             // visible jump from zero on the way in.
             let content = measured > 0 ? measured : 260
-            // Grows to show the whole session without scrolling. Only a panel
-            // taller than the screen (a very long expanded activity log) is
-            // capped and scrolls.
+            // Grows with the session up to a cap well short of the screen;
+            // past it the detail scrolls, so one long session does not take
+            // over the desktop.
             return min(
                 max(chrome + detailChrome + content, 150) + cards,
-                Self.maximumDetailHeight
+                min(Self.maximumDetailHeight, Self.sessionDetailHeightCap + cards)
             )
         }
 
@@ -640,6 +640,10 @@ final class IslandViewModel: ObservableObject {
         let available = (screen?.visibleFrame.height ?? 900) - 120
         return max(470, available)
     }
+
+    /// Tallest the session detail grows before it scrolls, approval cards
+    /// aside.
+    static let sessionDetailHeightCap: CGFloat = 560
 
     static let goalRowHeight: CGFloat = 22
     static let maxUnscrolledGoals = 6
@@ -758,7 +762,7 @@ final class IslandViewModel: ObservableObject {
         settings.isEnabled(.music)
             && timerStore.state == .idle
             && voiceDictation.phase == .idle
-            && !sessionStore.liveSessions.contains(where: \.isActive)
+            && !sessionStore.liveSessions.contains { $0.isActive || $0.subagentsWorking > 0 }
             && !agentService.snapshots.contains(where: \.isActive)
     }
 

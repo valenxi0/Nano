@@ -30,6 +30,10 @@ struct AgentProviderAdapter: Equatable, Sendable {
         case unavailable
     }
 
+    /// Tool names that hand work to another agent, as a hook matcher. Kept in
+    /// step with `AgentHookBridge.isDelegationTool`.
+    static let delegationMatcher = "Task|Agent|.*([Dd]elegate|[Ss]pawn|[Ss]ubagent|[Hh]andoff).*"
+
     struct Hook: Equatable, Sendable {
         let event: String
         let timeout: Int
@@ -107,6 +111,9 @@ enum AgentProviderRegistry {
             hooks: [
                 .init(event: "PermissionRequest", timeout: 86_400),
                 .init(event: "PreToolUse", timeout: 86_400, matcher: "AskUserQuestion"),
+                // Delegations, so the session a subagent starts can be folded
+                // into this one before that subagent finishes.
+                .init(event: "PreToolUse", timeout: 5, matcher: AgentProviderAdapter.delegationMatcher),
                 .init(event: "Notification", timeout: 5),
                 .init(event: "SessionStart", timeout: 5),
                 .init(event: "SessionEnd", timeout: 5),

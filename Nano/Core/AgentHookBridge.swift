@@ -195,7 +195,53 @@ final class AgentHookBridge: ObservableObject {
         var turnStartedAt: Date? = nil
         /// When a turn-end hook last arrived. Cleared as soon as work resumes.
         var finishedAt: Date? = nil
+        /// The session that delegated this one, when it is a subagent run as
+        /// a session of its own. Its row folds into the parent's.
+        var parentSessionID: String? = nil
+        /// Built-in subagents this session started, from its subagent hooks.
+        /// Transcripts are not re-read while hooks cover a session, so this is
+        /// what keeps their state live.
+        var subagents: [LiveSubagent] = []
     }
+
+    struct LiveSubagent: Equatable, Sendable {
+        let agentID: String
+        var type: String
+        var description: String?
+        var toolUseID: String?
+        var isBackground = false
+        let startedAt: Date
+        var finishedAt: Date?
+    }
+
+    /// A delegation seen in a parent's `PreToolUse`, waiting for the session
+    /// it starts. Hosts launch that child as a separate agent process, so the
+    /// brief it was handed is the only thing that ties the two together.
+    struct PendingDelegation: Equatable, Sendable {
+        let parentSessionID: String
+        /// Whitespace-collapsed opening of the brief.
+        let brief: String
+        let at: Date
+    }
+
+    /// Recent delegations, newest last. Each is used once.
+    private(set) var pendingDelegations: [PendingDelegation] = []
+
+    /// First prompts of recent sessions with no parent yet. A host can start
+    /// the child before the parent's delegation reaches Nano (only the
+    /// post-tool event, or a slow hook), so the match runs in both orders.
+    private var unclaimedFirstPrompts: [(sessionID: String, prompt: String, at: Date)] = []
+    /// Delegations already linked, so the post-tool event of one that was
+    /// matched on its pre-tool event is not taken as a second delegation.
+    private var linkedDelegations: [String] = []
+
+    /// How long a delegation waits for its child. Hosts can spend a while
+    /// creating a worktree before the child's first prompt.
+    nonisolated static let delegationWindow: TimeInterval = 15 * 60
+
+    /// Saved child-to-parent links, so a restart or a transcript scan does
+    /// not bring a child back as a row of its own.
+    var subagentLinks = AgentSubagentLinks.shared
 
     /// A turn that ends without a hook (an interrupt, a killed terminal) never
     /// reports it. After this long with no event the session is not working.
@@ -380,6 +426,12 @@ final class AgentHookBridge: ObservableObject {
         if name == "UserPromptSubmit", let sessionID {
             didResumeSession?(sessionID)
         }
+        if name == "PreToolUse" || name == "PostToolUse", let sessionID {
+            noteDelegation(from: sessionID, event: event, at: Date())
+        }
+        let parentSessionID = sessionID.flatMap {
+            linkParent(of: $0, name: name, event: event, payload: payload, at: Date())
+        }
         // Subagent lifecycle hooks describe work inside an existing parent.
         // Some providers report the parent's session ID, while others report
         // a child ID. Never let that event alone manufacture a top-level row;
@@ -406,7 +458,8 @@ final class AgentHookBridge: ObservableObject {
                 source: source,
                 event: event,
                 name: name,
-                at: now
+                at: now,
+                parentSessionID: parentSessionID
             )
         }
 
@@ -654,7 +707,8 @@ final class AgentHookBridge: ObservableObject {
         source: String,
         event: [String: Any],
         name: String,
-        at now: Date
+        at now: Date,
+        parentSessionID: String? = nil
     ) -> Bool {
         var state = sessionStates[sessionID] ?? LiveSessionState(
             sessionID: sessionID,
@@ -663,6 +717,9 @@ final class AgentHookBridge: ObservableObject {
             lastEventAt: now,
             isWorking: true
         )
+        if state.parentSessionID == nil {
+            state.parentSessionID = parentSessionID
+        }
 
         state.source = source
         if source == "cursor" { state.providerID = nil }
@@ -744,10 +801,29 @@ final class AgentHookBridge: ObservableObject {
             // the turn announced "finished" several times per real turn. The
             // agent is still working until `stop` arrives.
             state.isWorking = true
-        case "SessionStart", "SubagentStart":
+        case "SessionStart":
             state.isWorking = true
+        case "SubagentStart":
+            state.isWorking = true
+            if let agentID = event["agent_id"] as? String, !agentID.isEmpty,
+               !state.subagents.contains(where: { $0.agentID == agentID }) {
+                var subagent = LiveSubagent(
+                    agentID: agentID,
+                    type: (event["agent_type"] as? String) ?? "agent",
+                    startedAt: now
+                )
+                Self.describe(&subagent, transcriptPath: state.transcriptPath)
+                state.subagents.append(subagent)
+                state.subagents = Array(state.subagents.suffix(40))
+            }
         case "SubagentStop":
-            break
+            if let agentID = event["agent_id"] as? String,
+               let index = state.subagents.firstIndex(where: { $0.agentID == agentID }) {
+                state.subagents[index].finishedAt = now
+                if state.subagents[index].description == nil {
+                    Self.describe(&state.subagents[index], transcriptPath: state.transcriptPath)
+                }
+            }
         default:
             break
         }
@@ -761,6 +837,157 @@ final class AgentHookBridge: ObservableObject {
             sessionStates = sessionStates.filter { $0.value.lastEventAt > cutoff }
         }
         return finishedTurn
+    }
+
+    // MARK: - Subagent sessions
+
+    /// Claude Code writes `<session>/subagents/agent-<id>.meta.json` beside
+    /// the transcript: the subagent's description, the tool call that started
+    /// it, and whether it runs in the background.
+    nonisolated static func describe(_ subagent: inout LiveSubagent, transcriptPath: String?) {
+        guard let transcriptPath, transcriptPath.hasSuffix(".jsonl") else { return }
+        let url = URL(fileURLWithPath: String(transcriptPath.dropLast(6)))
+            .appendingPathComponent("subagents/agent-\(subagent.agentID).meta.json")
+        guard let data = try? Data(contentsOf: url),
+              let meta = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return }
+        if let description = meta["description"] as? String, !description.isEmpty {
+            subagent.description = description
+        }
+        if let type = meta["agentType"] as? String, !type.isEmpty { subagent.type = type }
+        subagent.toolUseID = (meta["toolUseId"] as? String) ?? subagent.toolUseID
+        if let shape = meta["requestShape"] as? String { subagent.isBackground = shape == "background" }
+    }
+
+    /// Remembers a delegation so the session it starts can be linked back.
+    private func noteDelegation(from parentID: String, event: [String: Any], at now: Date) {
+        guard let tool = (event["tool_name"] as? String) ?? (event["toolName"] as? String),
+              let input = (event["tool_input"] as? [String: Any]) ?? (event["toolInput"] as? [String: Any]),
+              let brief = Self.delegationBrief(tool: tool, input: input)
+        else { return }
+        let key = parentID + "\u{0}" + brief
+        guard !linkedDelegations.contains(key),
+              !pendingDelegations.contains(where: { $0.parentSessionID == parentID && $0.brief == brief })
+        else { return }
+        unclaimedFirstPrompts.removeAll { now.timeIntervalSince($0.at) > Self.delegationWindow }
+        if let index = unclaimedFirstPrompts.lastIndex(where: {
+            $0.sessionID != parentID && $0.prompt.contains(brief)
+        }) {
+            let child = unclaimedFirstPrompts.remove(at: index).sessionID
+            link(child: child, to: parentID, delegation: key)
+            return
+        }
+        pendingDelegations.removeAll { now.timeIntervalSince($0.at) > Self.delegationWindow }
+        pendingDelegations.append(PendingDelegation(parentSessionID: parentID, brief: brief, at: now))
+        pendingDelegations = Array(pendingDelegations.suffix(50))
+    }
+
+    private func link(child: String, to parent: String, delegation key: String?) {
+        subagentLinks.link(child: child, to: parent)
+        if let key {
+            linkedDelegations.append(key)
+            linkedDelegations = Array(linkedDelegations.suffix(100))
+        }
+        // A child linked after its first event already has state; the next
+        // publish folds its row away.
+        if sessionStates[child] != nil, sessionStates[child]?.parentSessionID == nil {
+            sessionStates[child]?.parentSessionID = parent
+        }
+    }
+
+    /// The parent of `sessionID`, linking it on this event if it can be.
+    ///
+    /// In order: a link already made, a parent the launcher named in
+    /// `NANO_PARENT_SESSION_ID`, and a delegation whose brief opens the
+    /// session's first prompt.
+    private func linkParent(
+        of sessionID: String,
+        name: String,
+        event: [String: Any],
+        payload: [String: Any],
+        at now: Date
+    ) -> String? {
+        if let known = sessionStates[sessionID]?.parentSessionID ?? subagentLinks.parent(of: sessionID) {
+            return known
+        }
+        if let named = (payload["parent_session_id"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !named.isEmpty, named != sessionID {
+            link(child: sessionID, to: named, delegation: nil)
+            return named
+        }
+        guard name == "UserPromptSubmit",
+              sessionStates[sessionID]?.lastUserPrompt == nil,
+              let prompt = Self.promptText(from: event)
+        else { return nil }
+        if let index = Self.delegationIndex(
+            matching: prompt,
+            in: pendingDelegations,
+            excluding: sessionID,
+            at: now
+        ) {
+            let delegation = pendingDelegations.remove(at: index)
+            link(
+                child: sessionID,
+                to: delegation.parentSessionID,
+                delegation: delegation.parentSessionID + "\u{0}" + delegation.brief
+            )
+            return delegation.parentSessionID
+        }
+        let normalized = Self.normalizedBrief(prompt)
+        if normalized.count >= Self.minimumBriefLength {
+            unclaimedFirstPrompts.append((sessionID, normalized, now))
+            unclaimedFirstPrompts = Array(unclaimedFirstPrompts.suffix(50))
+        }
+        return nil
+    }
+
+    /// Tool names that hand work to another agent: T3's `delegate_task`,
+    /// Codex's `spawn_agent`, Claude's `Task`/`Agent`, and the MCP tools other
+    /// hosts name the same way. Only the last `__` segment is read, so any
+    /// server prefix works.
+    nonisolated static func isDelegationTool(_ tool: String) -> Bool {
+        let leaf = (tool.components(separatedBy: "__").last ?? tool).lowercased()
+        if leaf == "task" || leaf == "agent" { return true }
+        return ["delegate", "spawn", "subagent", "handoff"].contains { leaf.contains($0) }
+    }
+
+    /// Shortest brief worth matching on. Anything shorter could open an
+    /// unrelated prompt by chance.
+    nonisolated static let minimumBriefLength = 24
+    /// The child's prompt is compared on this much of the brief. Hosts add a
+    /// line of their own around it, rarely more.
+    nonisolated static let briefMatchLength = 300
+
+    /// The brief a delegation tool hands its child, normalised for matching.
+    nonisolated static func delegationBrief(tool: String, input: [String: Any]) -> String? {
+        guard isDelegationTool(tool) else { return nil }
+        let keys = ["task", "prompt", "message", "brief", "instructions", "input"]
+        let longest = keys.compactMap { input[$0] as? String }.max { $0.count < $1.count }
+        guard let brief = longest.map(normalizedBrief), brief.count >= minimumBriefLength
+        else { return nil }
+        return String(brief.prefix(briefMatchLength))
+    }
+
+    nonisolated static func normalizedBrief(_ text: String) -> String {
+        text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    /// Newest unexpired delegation whose brief appears in `prompt`.
+    nonisolated static func delegationIndex(
+        matching prompt: String,
+        in delegations: [PendingDelegation],
+        excluding sessionID: String,
+        at now: Date
+    ) -> Int? {
+        let text = normalizedBrief(prompt)
+        guard text.count >= minimumBriefLength else { return nil }
+        return delegations.indices.last { index in
+            let delegation = delegations[index]
+            return delegation.parentSessionID != sessionID
+                && now.timeIntervalSince(delegation.at) <= delegationWindow
+                && text.contains(delegation.brief)
+        }
     }
 
     /// Providers do not agree on the session key. Claude uses `session_id`,
@@ -843,6 +1070,9 @@ final class AgentHookBridge: ObservableObject {
     nonisolated static func isHostInjectedPrompt(_ prompt: String) -> Bool {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("<"), trimmed.contains(">") { return true }
+        if trimmed == "Tool loaded." { return true }
+        // Claude Code's note on a screenshot it scaled down, alone.
+        if trimmed.hasPrefix("[Image: original "), trimmed.hasSuffix("]"), !trimmed.contains("\n") { return true }
         return trimmed.hasPrefix("[SYSTEM NOTIFICATION")
     }
 
@@ -1172,8 +1402,14 @@ final class AgentHookBridge: ObservableObject {
             var entries = hooks[hook.event] as? [[String: Any]] ?? []
             var new = entry(command, timeout: hook.timeout)
             if let matcher = hook.matcher { new["matcher"] = matcher }
+            // Where Nano wants several entries for one event, each is told
+            // apart by its matcher. Otherwise any Nano entry is the one, as
+            // older installs may have written it without a matcher.
+            let sharesEvent = wanted.filter { $0.event == hook.event }.count > 1
 
-            if let index = entries.firstIndex(where: { contains($0, bridge) }) {
+            if let index = entries.firstIndex(where: {
+                contains($0, bridge) && (!sharesEvent || $0["matcher"] as? String == hook.matcher)
+            }) {
                 let handlers = entries[index]["hooks"] as? [[String: Any]] ?? []
                 // An entry Nano shares with someone else's handler is theirs
                 // to shape; only one that is wholly Nano's is rewritten.
@@ -1900,6 +2136,10 @@ final class AgentHookBridge: ObservableObject {
     # back to the right host. Restricted to bundle-ID characters for the JSON.
     host=$(printf '%s' "${__CFBundleIdentifier:-}" | tr -cd 'A-Za-z0-9.-')
 
+    # A launcher that runs a subagent as its own session can name the session
+    # that delegated it, so the island folds the child into that parent.
+    parent=$(printf '%s' "${NANO_PARENT_SESSION_ID:-}" | tr -cd 'A-Za-z0-9._:-')
+
     # Devin's hook payloads carry no cwd; it exports DEVIN_PROJECT_DIR to hook
     # processes instead. Escape the two characters JSON strings cannot hold
     # verbatim so the path survives as a value.
@@ -1909,8 +2149,8 @@ final class AgentHookBridge: ObservableObject {
     # (Claude in bypass mode approves a command while its PermissionRequest
     # hook is still running) kills them, and the island retracts the card.
     # The socket cannot say so: nc half-closes as soon as it has sent.
-    reply=$(printf '{"token":"%s","source":"%s","host_bundle_id":"%s","project_dir":"%s","hook_pids":[%s,%s],"event":%s}\\n' \\
-      "$token" "$source" "$host" "$project_dir" "$$" "$PPID" "$payload" | nc -U "$sock" 2>/dev/null)
+    reply=$(printf '{"token":"%s","source":"%s","host_bundle_id":"%s","project_dir":"%s","parent_session_id":"%s","hook_pids":[%s,%s],"event":%s}\\n' \\
+      "$token" "$source" "$host" "$project_dir" "$parent" "$$" "$PPID" "$payload" | nc -U "$sock" 2>/dev/null)
 
     if [ -n "$reply" ]; then echo "$reply"; else echo '{}'; fi
     exit 0
@@ -2032,6 +2272,68 @@ enum AgentApprovalCopy {
 }
 
 // MARK: - Sessions another agent started
+
+/// Child session to parent session, for subagents that run as sessions of
+/// their own. Saved so the link outlives the hook events that made it.
+final class AgentSubagentLinks: @unchecked Sendable {
+    static let shared = AgentSubagentLinks(
+        storeURL: NanoStorage.root.appendingPathComponent("subagent-links.json")
+    )
+    private static let limit = 1000
+
+    private let storeURL: URL
+    private let lock = NSLock()
+    private var parents: [String: String] = [:]
+    /// Children oldest first, so the cap drops the oldest links.
+    private var order: [String]?
+
+    init(storeURL: URL) {
+        self.storeURL = storeURL
+    }
+
+    func parent(of child: String) -> String? {
+        lock.withLock {
+            load()
+            return parents[child]
+        }
+    }
+
+    func link(child: String, to parent: String) {
+        guard child != parent else { return }
+        lock.withLock {
+            load()
+            guard parents[child] == nil else { return }
+            parents[child] = parent
+            var children = (order ?? []) + [child]
+            if children.count > Self.limit {
+                children.prefix(children.count - Self.limit).forEach { parents[$0] = nil }
+                children = Array(children.suffix(Self.limit))
+            }
+            order = children
+            let object = children.compactMap { id in parents[id].map { ["child": id, "parent": $0] } }
+            if let data = try? JSONSerialization.data(withJSONObject: object) {
+                try? FileManager.default.createDirectory(
+                    at: storeURL.deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                try? data.write(to: storeURL, options: .atomic)
+            }
+        }
+    }
+
+    private func load() {
+        guard order == nil else { return }
+        let stored = (try? Data(contentsOf: storeURL))
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [[String: String]] } ?? []
+        var children: [String] = []
+        for entry in stored {
+            guard let child = entry["child"], let parent = entry["parent"], parents[child] == nil
+            else { continue }
+            parents[child] = parent
+            children.append(child)
+        }
+        order = children
+    }
+}
 
 /// Sessions that an agent started for itself, such as a `claude -p` run from
 /// a Bash tool to test something, or a headless script in a temp folder.

@@ -20,6 +20,8 @@ struct AgentModuleView: View {
     @State private var nameDraft = ""
     @State private var hoveredSessionID: String?
     @State private var copiedReplySessionID: String?
+    /// Height of the newest exchange, which sizes the conversation's window.
+    @State private var newestTurnHeight: CGFloat = 0
     @FocusState private var nameFieldFocused: Bool
 
     var body: some View {
@@ -103,8 +105,12 @@ struct AgentModuleView: View {
                     planSection(session)
                         .nanoRevealRow(2)
                 }
-                if !session.subagents.isEmpty {
-                    subagentSection(session)
+                let subagents = AgentSubagentEntry.entries(
+                    for: session,
+                    children: sessions.childSessions(of: session.id)
+                )
+                if !subagents.isEmpty {
+                    subagentSection(subagents)
                         .nanoRevealRow(3)
                 }
                 if Self.hasChanges(session) {
@@ -163,9 +169,37 @@ struct AgentModuleView: View {
                 .padding(.top, 2)
                 .contextMenu { nameMenu(session) }
 
+            if let parent = sessions.parentSession(of: session) {
+                Button { sessions.selectedID = parent.id } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.turn.down.right")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text("Subagent of \(parent.displayName)")
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 7.5, weight: .bold))
+                    }
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Self.subagentsTint)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.nanoPress)
+                .help("Open the session that started this one")
+            }
+
             HStack(spacing: 10) {
-                Text(session.projectName)
+                if let project = session.project {
+                    HStack(spacing: 4) {
+                        Text(project.name)
+                            .foregroundStyle(.white.opacity(0.7))
+                        if project.isWorktree {
+                            Text("\u{00B7} worktree")
+                        }
+                    }
                     .lineLimit(1)
+                    .help(session.workingDirectory ?? project.name)
+                }
                 if let branch = session.gitBranch {
                     Label(branch, systemImage: "arrow.triangle.branch")
                         .lineLimit(1)
@@ -219,23 +253,31 @@ struct AgentModuleView: View {
         let turns = Array(session.displayedTurns.suffix(Self.visibleTurns))
         let latest = session.recentActivity.last
         return VStack(alignment: .leading, spacing: 12) {
-            ForEach(Array(turns.enumerated()), id: \.offset) { index, turn in
-                let isNewest = index == turns.count - 1
-                if let prompt = turn.prompt {
-                    promptBubble(prompt, isNewest: isNewest)
+            if turns.count > 1 {
+                // Only the newest exchange is in view; earlier ones sit above
+                // it and scroll into view, so the rest of the panel stays put.
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(Array(turns.enumerated()), id: \.offset) { index, turn in
+                            let isNewest = index == turns.count - 1
+                            if isNewest {
+                                turnView(turn, isNewest: true, session: session)
+                                    .onGeometryChange(for: CGFloat.self) { $0.size.height.rounded() } action: {
+                                        newestTurnHeight = $0
+                                    }
+                            } else {
+                                turnView(turn, isNewest: false, session: session)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                if isNewest, !session.recentActivity.isEmpty {
-                    toolSection(session)
-                } else if let summary = turn.toolSummary {
-                    Text(summary)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.36))
-                        .lineLimit(1)
-                        .padding(.leading, 10)
-                }
-                if let reply = turn.reply {
-                    agentReply(reply, session: session, isNewest: isNewest)
-                }
+                .defaultScrollAnchor(.bottom)
+                .scrollIndicators(.automatic)
+                .frame(height: max(newestTurnHeight, 40))
+                .id(session.id)
+            } else if let turn = turns.first {
+                turnView(turn, isNewest: true, session: session)
             }
 
             if session.isActive, let latest {
@@ -266,7 +308,30 @@ struct AgentModuleView: View {
         }
     }
 
-    private static let visibleTurns = 3
+    /// One exchange: the prompt, what the agent did, and its reply.
+    @ViewBuilder
+    private func turnView(_ turn: AgentConversationTurn, isNewest: Bool, session: AgentSession) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let prompt = turn.prompt {
+                promptBubble(prompt, isNewest: isNewest)
+            }
+            if isNewest, !session.recentActivity.isEmpty {
+                toolSection(session)
+            } else if let summary = turn.toolSummary {
+                Text(summary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.36))
+                    .lineLimit(1)
+                    .padding(.leading, 10)
+            }
+            if let reply = turn.reply {
+                agentReply(reply, session: session, isNewest: isNewest)
+            }
+        }
+    }
+
+    /// Turns kept for scrolling back; only the newest is in view.
+    private static let visibleTurns = 6
 
     private func promptBubble(_ prompt: String, isNewest: Bool) -> some View {
         HStack(spacing: 0) {
@@ -763,42 +828,152 @@ struct AgentModuleView: View {
 
     // MARK: Subagents
 
-    private func subagentSection(_ session: AgentSession) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            sectionHeader(
-                "Subagents",
-                count: session.subagents.count,
-                tint: Self.subagentsTint,
-                isOpen: isOpen("subagents")
-            ) { toggle("subagents") }
+    private func subagentSection(_ entries: [AgentSubagentEntry]) -> some View {
+        let running = entries.filter(\.isRunning).count
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                sectionHeader(
+                    "Subagents",
+                    count: entries.count,
+                    tint: Self.subagentsTint,
+                    isOpen: isOpen("subagents")
+                ) { toggle("subagents") }
+                    .fixedSize()
+                if running > 0 {
+                    Text("\(running) working")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(Self.subagentsTint.opacity(0.9))
+                }
+                Spacer(minLength: 0)
+            }
 
             if isOpen("subagents") {
-                ForEach(Array(session.subagents.enumerated()), id: \.element.id) { index, agent in
-                    HStack(spacing: 7) {
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(Self.subagentsTint)
-                            .frame(width: 12)
-                        Text(agent.displayName)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.92))
-                            .lineLimit(1)
-                        if let role = agent.roleLabel {
-                            Text(role)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.46))
-                                .lineLimit(1)
-                        }
-                        Spacer(minLength: 0)
+                let rows = VStack(spacing: Self.subagentRowSpacing) {
+                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        subagentRow(entry)
+                            .nanoRevealRow(index)
                     }
-                    .nanoRevealRow(index)
+                }
+                // Past a few rows the list scrolls, so a session that
+                // delegated a lot does not stretch the island.
+                if entries.count > Self.visibleSubagents {
+                    ScrollView(.vertical) { rows }
+                        .scrollIndicators(.automatic)
+                        .frame(height: CGFloat(Self.visibleSubagents) * Self.subagentRowHeight
+                            + CGFloat(Self.visibleSubagents - 1) * Self.subagentRowSpacing
+                            + Self.subagentRowHeight / 2)
+                } else {
+                    rows
                 }
             }
         }
     }
 
+    /// A child session opens its own detail; a transcript subagent has no
+    /// session to open, so its row is not a button.
+    @ViewBuilder
+    private func subagentRow(_ entry: AgentSubagentEntry) -> some View {
+        if let id = entry.sessionID {
+            Button { sessions.selectedID = id } label: { subagentRowContent(entry) }
+                .buttonStyle(.nanoPress)
+                .help("Open this subagent's session")
+        } else {
+            subagentRowContent(entry)
+        }
+    }
+
+    private func subagentRowContent(_ entry: AgentSubagentEntry) -> some View {
+        HStack(spacing: 8) {
+            subagentStatusMark(entry.status)
+                .frame(width: 12)
+            Text(entry.name)
+                .font(.system(size: 12))
+                .foregroundStyle(.white.opacity(0.92))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(1)
+            Spacer(minLength: 4)
+            if let model = entry.model {
+                AgentModelName(raw: model, markSize: 10.5)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.42))
+                    .lineLimit(1)
+            } else if let role = entry.role {
+                Text(role)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.42))
+                    .lineLimit(1)
+            }
+            subagentTime(entry)
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 8.5, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.4))
+                .opacity(entry.sessionID == nil ? 0 : 1)
+        }
+        .padding(.horizontal, 9)
+        .frame(height: Self.subagentRowHeight)
+        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(entry.status == .needsYou ? Color.orange.opacity(0.35) : .white.opacity(0.05), lineWidth: 0.75)
+        )
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func subagentStatusMark(_ status: AgentSubagentEntry.Status) -> some View {
+        switch status {
+        case .working:
+            AgentWorkingOrb(diameter: 11)
+                .frame(width: 11, height: 6)
+        case .needsYou:
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(.orange)
+        case .done:
+            Image(systemName: "checkmark")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(Color(red: 0.24, green: 0.81, blue: 0.43))
+        case .failed:
+            Image(systemName: "xmark")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.red.opacity(0.85))
+        case .stopped:
+            Circle()
+                .fill(.white.opacity(0.25))
+                .frame(width: 6, height: 6)
+        }
+    }
+
+    /// Ticks every second while the subagent runs.
+    @ViewBuilder
+    private func subagentTime(_ entry: AgentSubagentEntry) -> some View {
+        if entry.isRunning {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                subagentTimeText(entry.timeLabel(now: context.date), live: true)
+            }
+        } else {
+            subagentTimeText(entry.timeLabel(), live: false)
+        }
+    }
+
+    @ViewBuilder
+    private func subagentTimeText(_ text: String?, live: Bool) -> some View {
+        if let text {
+            Text(text)
+                .font(.system(size: 11))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(live ? 0.7 : 0.42))
+                .lineLimit(1)
+                .fixedSize()
+        }
+    }
+
     private static let planTint = Color(red: 0.96, green: 0.66, blue: 0.36)
-    private static let subagentsTint = Color(red: 0.86, green: 0.56, blue: 0.96)
+    private static let visibleSubagents = 4
+    private static let subagentRowHeight: CGFloat = 27
+    private static let subagentRowSpacing: CGFloat = 4
+    private static let subagentsTint = AgentSessionRow.subagentTint
 
     /// Compact age for a feed row: "now", "4m", "2h", "3d".
     private static func ago(_ date: Date) -> String {
@@ -2070,7 +2245,43 @@ struct NanoListHeightKey: PreferenceKey {
 /// several clients and are not guaranteed to be short.
 /// One session as the Agents module lists it. The dashboard draws the same
 /// row in `compact` form, so the two never read as different designs.
+/// "2 subagents" on a parent's row, spinning while any of them works.
+struct AgentSubagentCountChip: View {
+    let working: Int
+    let total: Int
+    var size: CGFloat = 11
+
+    private var running: Bool { working > 0 }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if running {
+                AgentWorkingOrb(diameter: size)
+                    .frame(width: size, height: 6)
+            }
+            Text(label)
+                .lineLimit(1)
+        }
+        .font(.system(size: size, weight: .semibold))
+        .foregroundStyle(AgentSessionRow.subagentTint.opacity(running ? 1 : 0.75))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 1.5)
+        .background(AgentSessionRow.subagentTint.opacity(0.14), in: Capsule())
+        .fixedSize()
+        .help(running ? "\(working) of \(total) subagents still working" : "All \(total) subagents finished")
+    }
+
+    private var label: String {
+        let noun = total == 1 ? "subagent" : "subagents"
+        if running { return working == total ? "\(total) \(noun)" : "\(working)/\(total) \(noun)" }
+        return "\(total) \(noun) \u{00B7} done"
+    }
+}
+
 struct AgentSessionRow: View {
+    /// The Subagents section's colour, shared by every subagent marker.
+    static let subagentTint = Color(red: 0.86, green: 0.56, blue: 0.96)
+
     let session: AgentSession
     var compact = false
     /// Model and context column. A half-width widget has no room for it.
@@ -2090,8 +2301,28 @@ struct AgentSessionRow: View {
             VStack(alignment: .leading, spacing: size(3, 2)) {
                 AgentSessionTitleLabel(title: session.displayName, size: size(15, 12.5))
 
+                if let parentTitle = session.parentTitle {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.turn.down.right")
+                            .font(.system(size: size(9, 8), weight: .semibold))
+                        Text("Subagent of \(parentTitle)")
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .font(.system(size: size(11.5, 10), weight: .medium))
+                    .foregroundStyle(AgentSessionRow.subagentTint)
+                }
+
                 HStack(spacing: 6) {
                     AgentSessionStatusLabel(session: session, size: size(12, 10.5))
+                    if session.subagentCount > 0 {
+                        AgentSubagentCountChip(
+                            working: session.subagentsWorking,
+                            total: session.subagentCount,
+                            size: size(11, 9.5)
+                        )
+                        .layoutPriority(1)
+                    }
                     // The answer just sent from the island, so a glance
                     // confirms the tap landed after its card is gone.
                     if let note = session.nanoDecision {
@@ -2105,17 +2336,27 @@ struct AgentSessionRow: View {
                             }
                         }
                     }
-                    if let detail = session.statusDetail() {
-                        Text("\u{00B7} \(detail)")
-                            .font(.system(size: size(12, 10.5)))
-                            .foregroundStyle(.white.opacity(0.5))
+                    // Which project, first: several sessions often share a
+                    // title's topic but not a checkout. When the line runs
+                    // out of room the activity goes first, then the branch.
+                    if let project = session.project {
+                        Text("\u{00B7} \(project.name)")
+                            .font(.system(size: size(12, 10.5), weight: .medium))
+                            .foregroundStyle(.white.opacity(0.72))
                             .lineLimit(1)
-                            .layoutPriority(-1)
+                            .help(session.workingDirectory ?? project.name)
                     }
                     if let branch = session.gitBranch {
                         Label(branch, systemImage: "arrow.triangle.branch")
                             .font(.system(size: size(11.5, 10)))
                             .foregroundStyle(.white.opacity(0.3))
+                            .lineLimit(1)
+                            .layoutPriority(-1)
+                    }
+                    if let detail = session.statusDetail() {
+                        Text("\u{00B7} \(detail)")
+                            .font(.system(size: size(12, 10.5)))
+                            .foregroundStyle(.white.opacity(0.5))
                             .lineLimit(1)
                             .layoutPriority(-2)
                     }
