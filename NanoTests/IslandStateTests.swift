@@ -39,7 +39,8 @@ final class IslandStateTests: XCTestCase {
             .music, .weather, .agents, .cue, .tray, .calendar, .timer,
         ])
         XCTAssertTrue(DashboardArea.area3.compatibleModules.contains(.battery))
-        XCTAssertFalse(DashboardArea.area3.compatibleModules.contains(.music))
+        XCTAssertTrue(DashboardArea.area3.compatibleModules.contains(.music))
+        XCTAssertFalse(DashboardArea.area5.compatibleModules.contains(.music))
     }
 
     @MainActor
@@ -2535,7 +2536,7 @@ final class IslandStateTests: XCTestCase {
     func testDashboardSlotsAllowCalendarAndTimerStripsAndExplainRefusals() {
         XCTAssertTrue(DashboardArea.area3.compatibleModules.contains(.calendar))
         XCTAssertTrue(DashboardArea.area4.compatibleModules.contains(.timer))
-        XCTAssertEqual(NanoModuleRegistry.slots(for: .music), [.wide, .medium])
+        XCTAssertEqual(NanoModuleRegistry.slots(for: .music), [.wide, .medium, .strip])
         XCTAssertNil(NanoModuleRegistry.unfitReason(for: .music, in: .wide))
         XCTAssertNotNil(NanoModuleRegistry.unfitReason(for: .music, in: .quick))
         XCTAssertNotNil(NanoModuleRegistry.unfitReason(for: .battery, in: .quick))
@@ -2626,6 +2627,9 @@ final class IslandStateTests: XCTestCase {
         let mixed = DashboardLayout.placements(width: width, filled: [.area1, .area2, .area4, .area6])
         XCTAssertEqual(mixed[.area4]?.frame.width, mixed[.area1]?.frame.width)
         XCTAssertEqual(mixed[.area6]?.widensQuick, true)
+
+        // A strip alone on the bottom row (Music under the top row) spans it all.
+        XCTAssertEqual(DashboardLayout.placements(width: width, filled: [.area1, .area3])[.area3]?.frame.width, width)
 
         // Quick actions alone share the whole row.
         let quicks = DashboardLayout.placements(width: width, filled: [.area5, .area6])

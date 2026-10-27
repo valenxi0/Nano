@@ -332,6 +332,7 @@ struct DashboardWidget: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(padding)
             .foregroundStyle(.white)
+            .background(readableBacking)
             .dashboardWell(settings.appearance)
             .contentShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
             .onTapGesture(perform: action)
@@ -340,6 +341,13 @@ struct DashboardWidget: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel(module.title)
             .accessibilityAction(named: "Open \(module.title)", action)
+    }
+
+    /// The Music strip's small text can't hold up against whatever shows
+    /// through a glass or hybrid island, so it gets a dark backing there.
+    private var readableBacking: Color {
+        module == .music && slot == .strip && settings.appearance != .solidBlack
+            ? .black.opacity(0.6) : .clear
     }
 
     private var padding: EdgeInsets {
@@ -418,11 +426,104 @@ struct DashboardMusicWidget: View {
     let slot: DashboardSlot
 
     var body: some View {
-        if slot == .wide {
-            DashboardMusicView(controller: controller, openModule: {})
-        } else {
-            medium
+        switch slot {
+        case .wide: DashboardMusicView(controller: controller, openModule: {})
+        case .strip: strip
+        default: medium
         }
+    }
+
+    /// Artwork, track, controls, levels. With the room of a whole row or both
+    /// strip boxes it becomes two lines: everything on the title's line, and
+    /// the progress bar under it at full width. The artwork spans both lines.
+    private var strip: some View {
+        GeometryReader { proxy in
+            let roomy = proxy.size.width > 420
+            HStack(spacing: 12) {
+                MediaArtwork(controller: controller, size: 40, cornerRadius: 9, symbolSize: 15)
+                if roomy {
+                    VStack(spacing: 0) {
+                        HStack(alignment: .center, spacing: 8) {
+                            stripTitle
+                                .layoutPriority(1)
+                            stripSubtitle
+                            Spacer(minLength: 12)
+                            stripControls
+                        }
+                        .lineLimit(1)
+                        Spacer(minLength: 0)
+                        if controller.nowPlaying != nil {
+                            // The bar keeps a taller hit area for scrubbing; lay
+                            // it out at its drawn height so it sits on the line.
+                            MediaProgressRow(controller: controller, barHeight: 3, showsTimes: false)
+                                .frame(height: 3)
+                        }
+                    }
+                    .padding(.top, 2)
+                    .padding(.bottom, 4)
+                    .frame(height: 40)
+                } else {
+                    VStack(alignment: .leading, spacing: 2) {
+                        stripTitle
+                        stripSubtitle
+                    }
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    stripControls
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private var stripControls: some View {
+        if let track = controller.nowPlaying {
+            HStack(spacing: 16) {
+                Button(action: controller.previousTrack) { Image(systemName: "backward.fill") }
+                    .help("Previous track")
+                Button(action: controller.playPause) {
+                    Image(systemName: track.isPlaying ? "pause.fill" : "play.fill")
+                        .contentTransition(.symbolEffect(.replace))
+                        .font(.system(size: 14))
+                        .frame(width: 15)
+                }
+                .help("Play or pause")
+                Button(action: controller.nextTrack) { Image(systemName: "forward.fill") }
+                    .help("Next track")
+            }
+            .buttonStyle(.nanoPress)
+            .font(.system(size: 12))
+            .fixedSize()
+            NanoWave(
+                barCount: 4,
+                barWidth: 2.5,
+                height: 14,
+                color: track.player.accentColor,
+                isActive: track.isPlaying
+            )
+            .fixedSize()
+            .padding(.leading, 4)
+        } else if controller.automationNote == nil {
+            MediaIdlePill(controller: controller)
+        }
+    }
+
+    private var stripTitle: some View {
+        Text(controller.nowPlaying?.title ?? controller.lastPlayed?.title ?? "Nothing playing")
+            .font(.system(size: 12.5, weight: .semibold))
+            .opacity(controller.nowPlaying == nil && controller.lastPlayed != nil ? 0.75 : 1)
+    }
+
+    private var stripSubtitle: some View {
+        Text(subtitle)
+            .font(.system(size: 11))
+            .foregroundStyle(DashboardStyle.secondary)
+    }
+
+    private var subtitle: String {
+        controller.nowPlaying?.artist ?? controller.lastPlayed?.artist
+            ?? controller.automationNote ?? "Spotify or Apple Music"
     }
 
     private var medium: some View {

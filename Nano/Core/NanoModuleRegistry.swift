@@ -56,7 +56,7 @@ enum NanoModuleRegistry {
         case .area2:
             preferredOrder = [.music, .calendar, .timer, .weather, .agents]
         case .area3, .area4:
-            preferredOrder = [.weather, .agents, .calendar, .timer, .battery, .camera]
+            preferredOrder = [.music, .weather, .agents, .calendar, .timer, .battery, .camera]
         case .area5, .area6:
             preferredOrder = [.camera, .timer, .agents, .weather]
         }
@@ -68,7 +68,6 @@ enum NanoModuleRegistry {
     static func unfitReason(for module: NanoModuleID, in slot: DashboardSlot) -> String? {
         guard !slots(for: module).contains(slot) else { return nil }
         switch (module, slot) {
-        case (.music, .strip): return "Artwork and playback controls need at least a Medium slot."
         case (.music, .quick): return "Too small for playback controls. Media keys and the compact island cover this."
         case (.calendar, .quick): return "A date alone isn't useful here. Use a Status strip for the next event."
         case (.cue, .medium): return "The queue needs the width to keep to-dos readable."
@@ -92,7 +91,7 @@ enum NanoModuleRegistry {
 
     private static func areas(for id: NanoModuleID) -> Set<DashboardArea> {
         switch id {
-        case .music: [.area1, .area2]
+        case .music: [.area1, .area2, .area3, .area4]
         case .weather, .agents: Set(DashboardArea.allCases)
         case .tray, .cue: [.area1]
         case .calendar: [.area1, .area2, .area3, .area4]
