@@ -915,7 +915,9 @@ final class OnboardingFlow: ObservableObject {
 
     private func syncIsland() {
         let content: OnboardingIslandContent?
-        let home = settings.placement == .attached ? "around the notch" : "under the menu bar"
+        let home = settings.placement != .attached ? "under the menu bar"
+            : NSScreen.main.map({ NanoDisplayObstruction.measure(screen: $0).housing }) == .dynamicIsland
+                ? "around the camera" : "around the notch"
         switch step {
         case .arrival(.greeting), .arrival(.prompt):
             content = isReplay

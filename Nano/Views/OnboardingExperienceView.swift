@@ -233,7 +233,7 @@ struct OnboardingExperienceView: View {
                 .font(.system(size: 22, weight: .bold))
                 .tracking(-0.3)
             HStack(spacing: 10) {
-                placementCard(.attached, "Notch", hasNotch ? "Wraps the notch on this Mac" : "For Macs with a notch")
+                placementCard(.attached, "Notch", attachedDetail)
                 placementCard(.floating, "Floating", "Hangs under the menu bar")
             }
             ZStack(alignment: .bottomLeading) {
@@ -285,8 +285,11 @@ struct OnboardingExperienceView: View {
         }
     }
 
-    private var hasNotch: Bool {
-        NSScreen.screens.contains { $0.safeAreaInsets.top > 0 }
+    private var attachedDetail: String {
+        let housings = NSScreen.screens.map { NanoDisplayObstruction.measure(screen: $0).housing }
+        if housings.contains(.dynamicIsland) { return "Wraps the camera on this Mac" }
+        if housings.contains(.notch) { return "Wraps the notch on this Mac" }
+        return "For Macs with a notch"
     }
 
     private var dashboardClip: String {

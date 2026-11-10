@@ -1,6 +1,9 @@
 import AppKit
 import Combine
+import os
 import SwiftUI
+
+private let displayLog = Logger(subsystem: "com.nanoapp.Nano", category: "display")
 
 enum NanoDiag {
     private static let isEnabled = ProcessInfo.processInfo.environment["NANO_DIAG"] == "1"
@@ -114,12 +117,27 @@ enum IslandStage {
     )
 }
 
-/// Per-display camera-housing geometry reported by AppKit. This deliberately
-/// avoids model-name tables: the same MacBook may use its built-in notched
-/// display and a notch-free external display during one Nano session.
-struct NanoDisplayObstruction: Equatable {
-    static let none = NanoDisplayObstruction(width: 0, height: 0)
+/// What sits in the middle of a display's top edge.
+enum NanoCameraHousing: String, Equatable {
+    case none
+    /// The camera notch of 2021–2025 MacBooks, flush with the top edge.
+    case notch
+    /// The camera hole of the PROLED MacBook Pro (October 2026), where macOS
+    /// runs its own Dynamic Island.
+    case dynamicIsland
+}
 
+/// Per-display camera-housing geometry reported by AppKit. Measured per
+/// screen, not per model: the same MacBook may use its built-in display and a
+/// plain external display during one Nano session.
+struct NanoDisplayObstruction: Equatable {
+    static let none = NanoDisplayObstruction(housing: .none, width: 0, height: 0)
+
+    /// Used only when AppKit reports no menu-bar gap around the camera hole.
+    /// Estimated from Apple's product images, not measured on the hardware.
+    static let dynamicIslandFallbackSize = CGSize(width: 120, height: 37)
+
+    let housing: NanoCameraHousing
     let width: CGFloat
     let height: CGFloat
 
@@ -127,22 +145,29 @@ struct NanoDisplayObstruction: Equatable {
         screenFrame: CGRect,
         safeAreaInsets: NSEdgeInsets,
         auxiliaryTopLeftArea: CGRect?,
-        auxiliaryTopRightArea: CGRect?
+        auxiliaryTopRightArea: CGRect?,
+        isBuiltInTouchDisplay: Bool = false
     ) -> NanoDisplayObstruction {
-        guard safeAreaInsets.top > 0,
-              let left = auxiliaryTopLeftArea,
-              let right = auxiliaryTopRightArea
-        else {
-            return .none
+        var gap: CGFloat = 0
+        if safeAreaInsets.top > 0,
+           let left = auxiliaryTopLeftArea,
+           let right = auxiliaryTopRightArea {
+            gap = min(max(right.minX - left.maxX, 0), screenFrame.width)
         }
 
-        let gap = max(right.minX - left.maxX, 0)
-        guard gap > 0 else { return .none }
+        // The PROLED MacBook Pro is the only Mac with a touchscreen, and its
+        // built-in display is the one with the Dynamic Island.
+        if isBuiltInTouchDisplay {
+            let fallback = dynamicIslandFallbackSize
+            return NanoDisplayObstruction(
+                housing: .dynamicIsland,
+                width: gap > 0 ? gap : fallback.width,
+                height: safeAreaInsets.top > 0 ? safeAreaInsets.top : fallback.height
+            )
+        }
 
-        return NanoDisplayObstruction(
-            width: min(gap, screenFrame.width),
-            height: safeAreaInsets.top
-        )
+        guard gap > 0 else { return .none }
+        return NanoDisplayObstruction(housing: .notch, width: gap, height: safeAreaInsets.top)
     }
 
     static func measure(screen: NSScreen) -> NanoDisplayObstruction {
@@ -150,8 +175,39 @@ struct NanoDisplayObstruction: Equatable {
             screenFrame: screen.frame,
             safeAreaInsets: screen.safeAreaInsets,
             auxiliaryTopLeftArea: screen.auxiliaryTopLeftArea,
-            auxiliaryTopRightArea: screen.auxiliaryTopRightArea
+            auxiliaryTopRightArea: screen.auxiliaryTopRightArea,
+            isBuiltInTouchDisplay: screen.isBuiltInTouchDisplay
         )
+    }
+
+    /// The Mac's model identifier, such as "Mac16,7".
+    static let machineModel: String = {
+        var size = 0
+        sysctlbyname("hw.model", nil, &size, nil, 0)
+        var bytes = [CChar](repeating: 0, count: max(size, 1))
+        sysctlbyname("hw.model", &bytes, &size, nil, 0)
+        return String(cString: bytes)
+    }()
+
+    /// Everything AppKit reports about the top of a screen, for tuning the
+    /// island on hardware we haven't measured yet.
+    static func describe(screen: NSScreen) -> String {
+        let insets = screen.safeAreaInsets
+        func rect(_ r: CGRect?) -> String { r.map { "\(NSStringFromRect($0))" } ?? "nil" }
+        return "model=\(machineModel) screen=\"\(screen.localizedName)\" frame=\(NSStringFromRect(screen.frame))"
+            + " visible=\(NSStringFromRect(screen.visibleFrame)) scale=\(screen.backingScaleFactor)"
+            + " safeTop=\(insets.top) auxLeft=\(rect(screen.auxiliaryTopLeftArea))"
+            + " auxRight=\(rect(screen.auxiliaryTopRightArea)) builtInTouch=\(screen.isBuiltInTouchDisplay)"
+            + " -> \(measure(screen: screen))"
+    }
+}
+
+extension NSScreen {
+    var isBuiltInTouchDisplay: Bool {
+        guard #available(macOS 27.0, *), touchCapabilities.contains(.multiTouch),
+              let number = deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        else { return false }
+        return CGDisplayIsBuiltin(CGDirectDisplayID(number.uint32Value)) != 0
     }
 }
 
@@ -478,6 +534,7 @@ final class IslandPanelController {
     private var outsideClickGraceUntil = Date.distantPast
     private var isPointerInside = false
     private var lastHitSignature: HitSignature?
+    private var lastObstruction: NanoDisplayObstruction?
     private var hoverTimer: Timer?
     /// The drag pasteboard's count while the button was last up. A different
     /// count with the button held means a drag began since. It is taken on
@@ -1040,6 +1097,10 @@ final class IslandPanelController {
             y: (screen.frame.maxY - topGap - stageSize.height).rounded()
         )
 
+        if obstruction != lastObstruction {
+            lastObstruction = obstruction
+            displayLog.notice("\(NanoDisplayObstruction.describe(screen: screen), privacy: .public)")
+        }
         viewModel.notchWidth = obstruction.width
         viewModel.notchHeight = obstruction.height
         panel.setFrame(NSRect(origin: origin, size: stageSize), display: true)

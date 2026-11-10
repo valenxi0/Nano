@@ -1292,8 +1292,10 @@ final class NanoSettings: ObservableObject {
     }
 
     private static var mainScreenHasNotch: Bool {
+        // Not the PROLED MacBook Pro's camera hole: macOS's own Dynamic Island
+        // lives there, and Nano should not cover it until it has been measured.
         guard let screen = NSScreen.main else { return false }
-        return screen.auxiliaryTopLeftArea != nil && screen.auxiliaryTopRightArea != nil
+        return NanoDisplayObstruction.measure(screen: screen).housing == .notch
     }
 
     private static let defaultDashboardAreaAssignments: [DashboardArea: NanoModuleID] = [

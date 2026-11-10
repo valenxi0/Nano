@@ -1159,6 +1159,43 @@ final class IslandStateTests: XCTestCase {
         )
     }
 
+    func testNotchedDisplayIsClassifiedAsNotch() {
+        let obstruction = NanoDisplayObstruction.measure(
+            screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+            safeAreaInsets: NSEdgeInsets(top: 32, left: 0, bottom: 0, right: 0),
+            auxiliaryTopLeftArea: CGRect(x: 0, y: 950, width: 660, height: 32),
+            auxiliaryTopRightArea: CGRect(x: 852, y: 950, width: 660, height: 32)
+        )
+
+        XCTAssertEqual(obstruction, NanoDisplayObstruction(housing: .notch, width: 192, height: 32))
+    }
+
+    func testBuiltInTouchDisplayUsesTheMenuBarGapAroundTheDynamicIsland() {
+        let obstruction = NanoDisplayObstruction.measure(
+            screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+            safeAreaInsets: NSEdgeInsets(top: 34, left: 0, bottom: 0, right: 0),
+            auxiliaryTopLeftArea: CGRect(x: 0, y: 948, width: 700, height: 34),
+            auxiliaryTopRightArea: CGRect(x: 812, y: 948, width: 700, height: 34),
+            isBuiltInTouchDisplay: true
+        )
+
+        XCTAssertEqual(obstruction, NanoDisplayObstruction(housing: .dynamicIsland, width: 112, height: 34))
+    }
+
+    func testDynamicIslandWithoutReportedGeometryKeepsTheFallbackClear() {
+        let obstruction = NanoDisplayObstruction.measure(
+            screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+            safeAreaInsets: NSEdgeInsets(),
+            auxiliaryTopLeftArea: nil,
+            auxiliaryTopRightArea: nil,
+            isBuiltInTouchDisplay: true
+        )
+
+        XCTAssertEqual(obstruction.housing, .dynamicIsland)
+        XCTAssertEqual(obstruction.width, NanoDisplayObstruction.dynamicIslandFallbackSize.width)
+        XCTAssertEqual(obstruction.height, NanoDisplayObstruction.dynamicIslandFallbackSize.height)
+    }
+
     @MainActor
     func testNotchedDisplayReservesCompactWingsAndExpandedTopBand() {
         let suiteName = "NanoTests.notchGeometry.\(UUID().uuidString)"
