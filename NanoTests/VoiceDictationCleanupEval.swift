@@ -39,7 +39,7 @@ final class VoiceDictationCleanupEval: XCTestCase {
     static let prose = "I talked to the landlord yesterday and he said the repair is not going to happen until next month, which is, you know, kind of frustrating, but I don't think we should push back yet."
 
     static let fixtures: [Fixture] = {
-        let casual = VoiceDictationCleanupDirective(styling: .casual)
+        let casual = VoiceDictationCleanupDirective(styling: .semiCasual)
         let polished = VoiceDictationCleanupDirective.polished
         let formal = VoiceDictationCleanupDirective(styling: .formal)
         let lists = VoiceDictationCleanupDirective(styling: .semiFormal, structure: .lists)
@@ -48,7 +48,24 @@ final class VoiceDictationCleanupEval: XCTestCase {
             Fixture(id: "fillers-polished", directive: polished, transcript: fillers,
                     keeps: ["Thursday", "team", "standup"], drops: ["um", "uh", "Tuesday"]),
             Fixture(id: "fillers-casual", directive: casual, transcript: fillers,
-                    keeps: ["Thursday", "team", "standup"], drops: ["Tuesday"]),
+                    keeps: ["Thursday", "team", "standup", "I think"], drops: ["Tuesday", "um", "uh"]),
+            Fixture(id: "casual-keeps-apostrophes-and-names", directive: casual,
+                    transcript: "Um, so we're meeting Priya at the office, uh, and I'll bring the slides.",
+                    keeps: ["we're", "Priya", "I'll"], drops: ["um", "uh"]),
+            // A 1 to 2 s pause mid-sentence, as the segment join hands it over.
+            Fixture(id: "seam-polished", directive: polished,
+                    transcript: VoiceDictationTextPipeline.joinSegments([
+                        "We need to finish the.", "Settings screen redesign before Friday.",
+                    ]),
+                    keeps: ["finish the settings screen"]),
+            Fixture(id: "seam-casual", directive: casual,
+                    transcript: VoiceDictationTextPipeline.joinSegments([
+                        "We should ship it in three days.", "And then tell the whole team about it.",
+                    ]),
+                    keeps: ["days and then"]),
+            Fixture(id: "seam-real-sentence-end", directive: polished,
+                    transcript: VoiceDictationTextPipeline.joinSegments(["The build passed.", "So we can ship it today."]),
+                    keeps: ["build passed.", "ship it today"]),
             Fixture(id: "fillers-formal", directive: formal, transcript: fillers,
                     keeps: ["Thursday", "team", "standup"], drops: ["um", "uh", "Tuesday"]),
             Fixture(id: "prose-casual", directive: casual, transcript: prose,

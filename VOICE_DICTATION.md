@@ -41,23 +41,48 @@ it next to the final text). S1-mini only ever sees speech: snippet expansions
 are cut out before cleanup and spliced back afterwards, and vocabulary
 replacements run after cleanup so S1 cannot re-case them.
 
-## Text pipeline (per segment)
+## Text pipeline
 
-`VoiceDictationController.processSegment` runs, in order:
+Past 12 s of dictation (`earlySegmentMinimumSeconds`), the audio is cut at a
+pause and each piece is recognized while the user keeps talking. The text
+stages wait for release and run once over the whole dictation, so S1-mini
+sees both sides of every pause and a 1 to 2 s pause does not end the
+sentence. Sketch is the exception: each screenshot's words go through
+`processSegment` (recognition plus the text stages) on their own.
 
-1. Recognition with a `VoiceDictationRecognitionRequest`: the dictionary's
-   terms (Whisper's prompt; Parakeet's CTC booster when downloaded) and the
-   language (`VoiceDictationEngine.recognitionLanguage`). Cohere cannot detect
-   a language, so "Automatic" follows the Mac's preferred languages.
-2. Language gate (`VoiceDictationLanguageGuess`): S1-mini and number
+1. Recognition (`VoiceDictationController.recognize`) with a
+   `VoiceDictationRecognitionRequest`: the dictionary's terms (Whisper's
+   prompt; Parakeet's CTC booster when downloaded) and the language
+   (`VoiceDictationEngine.recognitionLanguage`). Cohere cannot detect a
+   language, so "Automatic" follows the Mac's preferred languages.
+2. The pieces are joined (`VoiceDictationTextPipeline.joinSegments`). The
+   recognizer ends every piece as a sentence, so at each join a common
+   word continuing the sentence is lowercased ("…the button. So it" →
+   "the button so it") and the full stop is dropped only when the sentence
+   clearly runs on (after "the", "and"…; before "and", "which", "to"…).
+   Names and other capitals, "I", abbreviations and stops in quotes stay.
+   This is the raw transcript, and what Verbatim and engines without a
+   cleaner paste. Sketch joins its pieces with the same `seam`.
+3. Language gate (`VoiceDictationLanguageGuess`): S1-mini and number
    formatting run on English only. Parakeet reports no language, so a
    confident NaturalLanguage reading of the transcript decides.
-3. Snippets and spoken layout cues ("new line", "new paragraph") are cut
-   out, then each speech piece is cleaned by S1-mini, or, without a cleaner,
-   gets Developer Mode formatting (terminals) and numbers as figures
-   (`VoiceDictationNumberFormatter`: span by span through NeMo ITN; one to
-   nine stay words in prose).
-4. Emoji names ("thumbs up emoji"), when spoken line breaks are on and the
+4. `processText`: snippets and spoken layout cues ("new line", "new
+   paragraph") are cut out, then each speech piece is cleaned by S1-mini in
+   chunks of up to 400 words (`VoiceDictationTranscriptChunker`), or,
+   without a cleaner, gets Developer Mode formatting (terminals) and numbers
+   as figures (`VoiceDictationNumberFormatter`: span by span through NeMo
+   ITN; one to nine stay words in prose).
+   - `VoiceDictationCleanupGuard` checks each cleaned chunk against its raw
+     text: fewer negations (a stutter like "I'm not, I'm not going" counts
+     once), a figure nobody said, or a sentence missing. When it rejects,
+     cleaned sentences are matched in order to the raw sentences they came
+     from, and only the blocks that fail go back to the raw text.
+   - Casual is S1-mini's `semi-casual` register (it keeps apostrophes,
+     names and "I"; `casual` lowercased everything and wrote "were" for
+     "we're"). It keeps "um" and "uh", so
+     `VoiceDictationTextPipeline.removingHesitations` drops them after,
+     without doubling punctuation or touching list indentation.
+5. Emoji names ("thumbs up emoji"), when spoken line breaks are on and the
    app isn't a terminal. Then vocabulary, last.
 
 On the whole joined text (`VoiceDictationController.finish`): a trailing
@@ -150,8 +175,9 @@ recording, and Quill's engines for the words.
   its time. ⌘Z removes the last mark.
 - On finish, the recording is cut at each screenshot's moment (and each mark
   when a screenshot has several), at the quietest pause from 1.5 s before to
-  0.3 s after (`VoiceDictationSketchText.cuts`); each piece goes through the
-  normal per-segment pipeline; the text is one line per screenshot:
+  0.3 s after (`VoiceDictationSketchText.cuts`); each piece is recognized and
+  cleaned on its own (`processSegment`), and the pieces of one line are joined
+  with `VoiceDictationTextPipeline.seam`; the text is one line per screenshot:
   `- #2 (0:09) [clicked] “…”`, `[screen changed]` for changes, `[1] [2]` for
   several marks. Screenshots get their ink, click ring and a "#N 0:15" badge
   and go out as one contact sheet (two per row), saved with the full-size

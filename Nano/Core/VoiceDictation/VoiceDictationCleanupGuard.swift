@@ -5,9 +5,9 @@ import Foundation
 /// A cleanup model tidying "I'd prefer to never merge this" into "I'd prefer
 /// to merge this" is the worst thing dictation can do: the sentence still
 /// reads well and says the opposite. The guard compares the recognizer's
-/// text with the cleaned text for one chunk and hands back the recognizer's
-/// text when the cleaned one has fewer negations, a figure nobody said, or a
-/// sentence missing. Less polished beats wrong. It also catches a chunk the
+/// text with the cleaned text for one chunk and, where the cleaned one has
+/// fewer negations, a figure nobody said, or a sentence missing, hands back
+/// the recognizer's text for those sentences. Less polished beats wrong. It also catches a chunk the
 /// model returned empty when there was clearly speech in it.
 ///
 /// Bare "no" is deliberately not counted: in speech it is usually a
@@ -37,26 +37,99 @@ enum VoiceDictationCleanupGuard {
     static let emptyOutputWordThreshold = 12
 
     static func verify(raw: String, cleaned: String) -> Verdict {
+        let rawTrimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanedTrimmed = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
         if cleanedTrimmed.isEmpty,
            VoiceDictationTranscriptChunker.wordCount(raw) >= emptyOutputWordThreshold {
-            return Verdict(text: raw.trimmingCharacters(in: .whitespacesAndNewlines), reason: .outputEmpty)
+            return Verdict(text: rawTrimmed, reason: .outputEmpty)
         }
+        guard let reason = rejection(raw: rawTrimmed, cleaned: cleanedTrimmed) else {
+            return Verdict(text: cleaned, reason: nil)
+        }
+        return Verdict(text: restoringRejected(raw: rawTrimmed, cleaned: cleanedTrimmed), reason: reason)
+    }
+
+    private static func rejection(raw: String, cleaned: String) -> Reason? {
         let rawCount = negationCount(raw)
-        let cleanedCount = negationCount(cleanedTrimmed)
-        if cleanedCount < rawCount {
-            return Verdict(
-                text: raw.trimmingCharacters(in: .whitespacesAndNewlines),
-                reason: .negationDropped(raw: rawCount, cleaned: cleanedCount)
-            )
+        let cleanedCount = negationCount(cleaned)
+        if cleanedCount < rawCount { return .negationDropped(raw: rawCount, cleaned: cleanedCount) }
+        if let figure = unspokenFigure(raw: raw, cleaned: cleaned) { return .numberChanged(figure) }
+        if let sentence = droppedSentence(raw: raw, cleaned: cleaned) { return .sentenceDropped(sentence) }
+        return nil
+    }
+
+    // MARK: - Partial restore
+
+    /// The cleaned text with only its rejected sentences put back as said.
+    ///
+    /// Each cleaned sentence is matched, in order, to the raw sentence it
+    /// shares the most words with. Raw sentences nothing matched (merged or
+    /// tidied away) join the block before them, so every block pairs a run
+    /// of raw sentences with the cleaned sentences made from it. Each block
+    /// is checked on its own; a failing one is replaced by its raw text and
+    /// the rest keep their cleanup and their line breaks.
+    static func restoringRejected(raw: String, cleaned: String) -> String {
+        let rawSentences = sentenceRanges(in: raw).map { String(raw[$0]) }
+        let units = sentenceRanges(in: cleaned)
+        let rawWords = rawSentences.map(matchWords)
+        var owners: [Int?] = []
+        var floor = 0
+        for unit in units {
+            let words = matchWords(String(cleaned[unit]))
+            var best: Int?
+            var bestOverlap = 0
+            for index in floor ..< rawWords.count {
+                let overlap = words.intersection(rawWords[index]).count
+                if overlap > bestOverlap { (best, bestOverlap) = (index, overlap) }
+            }
+            owners.append(best)
+            if let best { floor = best }
         }
-        if let figure = unspokenFigure(raw: raw, cleaned: cleanedTrimmed) {
-            return Verdict(text: raw.trimmingCharacters(in: .whitespacesAndNewlines), reason: .numberChanged(figure))
+        // A unit with nothing to match ("1." of a list item) goes with the next.
+        var following: Int?
+        for index in owners.indices.reversed() {
+            if let owner = owners[index] { following = owner } else { owners[index] = following }
         }
-        if let sentence = droppedSentence(raw: raw, cleaned: cleanedTrimmed) {
-            return Verdict(text: raw.trimmingCharacters(in: .whitespacesAndNewlines), reason: .sentenceDropped(sentence))
+        var preceding: Int?
+        for index in owners.indices {
+            if let owner = owners[index] { preceding = owner } else { owners[index] = preceding }
         }
-        return Verdict(text: cleaned, reason: nil)
+        let starts = owners.compactMap { $0 }.reduce(into: [Int]()) { if $0.last != $1 { $0.append($1) } }
+        guard starts.count > 1 else { return raw }
+
+        var result = ""
+        var unitIndex = 0
+        var previousEnd = cleaned.startIndex
+        for (block, start) in starts.enumerated() {
+            let first = unitIndex
+            while unitIndex < units.count, owners[unitIndex] == start { unitIndex += 1 }
+            let cleanedRange = units[first].lowerBound ..< units[unitIndex - 1].upperBound
+            let rawStart = block == 0 ? 0 : start
+            let rawEnd = block + 1 < starts.count ? starts[block + 1] : rawSentences.count
+            let rawText = rawSentences[rawStart ..< rawEnd].joined(separator: " ")
+            let cleanedText = String(cleaned[cleanedRange])
+            result += cleaned[previousEnd ..< cleanedRange.lowerBound]
+            result += rejection(raw: rawText, cleaned: cleanedText) == nil ? cleanedText : rawText
+            previousEnd = cleanedRange.upperBound
+        }
+        return result
+    }
+
+    /// Sentences and lines, without the space or line break between them.
+    private static func sentenceRanges(in text: String) -> [Range<String.Index>] {
+        var ranges: [Range<String.Index>] = []
+        var start = text.startIndex
+        let separator = #"(?<=[.!?])\s+|\s*\n\s*"#
+        while let gap = text.range(of: separator, options: .regularExpression, range: start ..< text.endIndex) {
+            if start < gap.lowerBound { ranges.append(start ..< gap.lowerBound) }
+            start = gap.upperBound
+        }
+        if start < text.endIndex { ranges.append(start ..< text.endIndex) }
+        return ranges
+    }
+
+    private static func matchWords(_ text: String) -> Set<String> {
+        Set(tokens(in: text).filter { $0.count >= 3 })
     }
 
     // MARK: - Figures
@@ -179,13 +252,33 @@ enum VoiceDictationCleanupGuard {
         "not", "never", "cannot", "neither", "nor", "none", "nothing", "nobody", "nowhere",
     ]
 
+    /// A stutter counts once: "I'm not, I'm not going" has one negation.
     static func negationCount(_ text: String) -> Int {
-        tokens(in: text).reduce(0) { count, token in
+        collapsingRepeats(tokens(in: text)).reduce(0) { count, token in
             let isNegation = negationWords.contains(token)
                 || token.hasSuffix("n't")
                 || apostropheless.contains(token)
             return count + (isNegation ? 1 : 0)
         }
+    }
+
+    /// Drops the first copy of a run of one to four words said twice in a row.
+    static func collapsingRepeats(_ tokens: [String]) -> [String] {
+        var kept: [String] = []
+        var index = 0
+        while index < tokens.count {
+            let repeated = (1 ... 4).reversed().first { length in
+                index + 2 * length <= tokens.count
+                    && tokens[index ..< index + length] == tokens[index + length ..< index + 2 * length]
+            }
+            if let repeated {
+                index += repeated
+            } else {
+                kept.append(tokens[index])
+                index += 1
+            }
+        }
+        return kept
     }
 
     /// Words, lowercased, with surrounding punctuation removed but internal

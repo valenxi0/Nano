@@ -216,6 +216,107 @@ struct VoiceDictationTextPipeline: Sendable {
         return segments.isEmpty ? [.speech("")] : segments
     }
 
+    /// Joins pieces of one dictation that were recognized separately, cut at
+    /// pauses. The recognizer ends every piece as a sentence, so a pause in
+    /// the middle of one reads "we should. Ship it": `seam` mends each join
+    /// before the pieces are put together.
+    static func joinSegments(_ pieces: [String]) -> String {
+        var joined: [String] = []
+        for piece in pieces {
+            var next = piece.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !next.isEmpty else { continue }
+            if let last = joined.indices.last {
+                (joined[last], next) = seam(joined[last], next)
+            }
+            joined.append(next)
+        }
+        return join(joined)
+    }
+
+    /// One join between pieces. The full stop before it is dropped only when
+    /// the sentence clearly runs on: after a word no sentence ends with
+    /// ("…and the. Report") or before a word that almost never opens one
+    /// ("…three days. And then"). The next piece's first word is lowercased
+    /// only when it is a common word, so names and "I" keep their capital.
+    /// Abbreviations ("e.g.") and stops inside quotes stay.
+    static func seam(_ previous: String, _ next: String) -> (previous: String, next: String) {
+        let before = previous.trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstWord = String(next.prefix { $0.isLetter || $0 == "'" || $0 == "’" })
+        let lower = firstWord.lowercased()
+        guard let last = before.last, firstWord.first?.isUppercase == true else { return (previous, next) }
+        let lowerable = firstWord.dropFirst().allSatisfy { !$0.isUppercase } && seamLowercaseWords.contains(lower)
+        let continued = lowerable ? lower + next.dropFirst(firstWord.count) : next
+        if last.isLetter || last.isNumber || last == "," {
+            return (previous, continued)
+        }
+        guard last == "." else { return (previous, next) }
+        let lastToken = before.split(whereSeparator: \.isWhitespace).last.map(String.init) ?? ""
+        let word = lastToken.dropLast().lowercased()
+        guard lastToken.filter({ $0 == "." }).count == 1,
+              word.last.map({ $0.isLetter || $0.isNumber }) == true,
+              !seamAbbreviations.contains(word),
+              seamDanglingEnds.contains(word) || (lowerable && seamContinuations.contains(lower))
+        else { return (previous, next) }
+        return (String(before.dropLast()), continued)
+    }
+
+    /// Words that do not end a sentence: "…and the. Report".
+    private static let seamDanglingEnds: Set<String> = [
+        "a", "an", "the", "and", "or", "nor", "my", "your", "our", "their", "its", "because", "than",
+    ]
+    /// Words that almost never open one: "…three days. And then". Words
+    /// like "to", "with" or "because" do ("With that done, …"), and "which"
+    /// opens questions, so a stop before them stays.
+    private static let seamContinuations: Set<String> = ["and", "or", "nor", "than"]
+    /// Common words safe to lowercase mid-sentence. A word outside this set
+    /// may be a name and keeps its capital.
+    private static let seamLowercaseWords: Set<String> = seamDanglingEnds.union(seamContinuations).union([
+        "but", "so", "for", "in", "on", "at", "by", "as", "about", "if", "when", "while", "then", "that", "this",
+        "these", "those", "there", "it", "it's", "we", "we're", "you", "you're", "they", "they're", "he", "she",
+        "is", "are", "was", "were", "be", "have", "has", "had", "do", "does", "did", "will", "would", "can",
+        "could", "should", "not", "also", "just", "maybe", "now", "what", "how", "why", "where", "who", "all",
+        "some", "any", "every", "each", "one", "that's", "there's", "let's", "like", "even", "still",
+        "which", "whose", "whom",
+    ])
+    private static let seamAbbreviations: Set<String> = [
+        "mr", "mrs", "ms", "dr", "st", "vs", "etc", "jr", "sr", "inc", "ltd", "co", "no",
+    ]
+
+    /// Drops "um", "uh" and "erm" from cleaned text. S1-mini's semi-casual
+    /// register keeps them. A dropped word's full stop moves to the word
+    /// before unless that one already ends in punctuation, so "so, um. Maybe"
+    /// is "so. Maybe", never "so.. Maybe"; a capitalized "Um" passes its
+    /// capital on. Line breaks and list indentation stay as they are.
+    static func removingHesitations(_ text: String) -> String {
+        text.components(separatedBy: "\n").map { line in
+            let indent = line.prefix { $0 == " " || $0 == "\t" }
+            var kept: [String] = []
+            var capitalizeNext = false
+            for token in line.dropFirst(indent.count).split(separator: " ") {
+                let core = token.trimmingCharacters(in: .letters.inverted)
+                guard core.lowercased().range(of: #"^(u+m+|u+h+|e+r+m+|u+h+m+)$"#, options: .regularExpression) != nil else {
+                    var word = String(token)
+                    if capitalizeNext, let first = word.first {
+                        word = first.uppercased() + word.dropFirst()
+                    }
+                    capitalizeNext = false
+                    kept.append(word)
+                    continue
+                }
+                if core.first?.isUppercase == true { capitalizeNext = true }
+                guard let stop = token.last(where: { ".!?".contains($0) }), let last = kept.indices.last,
+                      let end = kept[last].last
+                else { continue }
+                if end.isLetter || end.isNumber {
+                    kept[last].append(stop)
+                } else if end == "," || end == ";" {
+                    kept[last] = String(kept[last].dropLast()) + String(stop)
+                }
+            }
+            return kept.isEmpty ? "" : indent + kept.joined(separator: " ")
+        }.joined(separator: "\n")
+    }
+
     /// Joins pieces back into one string. Line breaks at the edges of a
     /// piece (a spoken "new paragraph") are kept between pieces, at most a
     /// blank line; a piece that opens a list starts on its own line; anything

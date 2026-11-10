@@ -58,7 +58,11 @@ actor S1MiniCleaner: VoiceDictationCleaner {
         // Output length tracks input length; 1.3× + 32 is the card's ceiling.
         let budget = min(Int(Double(model.tokenCount(of: trimmed)) * 1.3) + 32, 1024)
         do {
-            return Self.tidy(try model.generate(turn: turn, maxNewTokens: budget))
+            let cleaned = Self.tidy(try model.generate(turn: turn, maxNewTokens: budget))
+            // The semi-casual register keeps "um" and "uh"; Casual promises without.
+            return directive.styling == .semiCasual
+                ? VoiceDictationTextPipeline.removingHesitations(cleaned)
+                : cleaned
         } catch let error as LlamaRuntimeError {
             throw VoiceDictationError.cleanupFailed(Self.describe(error))
         }

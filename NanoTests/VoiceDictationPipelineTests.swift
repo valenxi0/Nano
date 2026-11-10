@@ -158,6 +158,48 @@ final class VoiceDictationPipelineTests: XCTestCase {
         XCTAssertEqual(Pipeline.join(["It cost", "1.5 million."]), "It cost 1.5 million.")
     }
 
+    func testSegmentJoinMendsAPauseInTheMiddleOfASentence() {
+        let join = VoiceDictationTextPipeline.joinSegments
+        XCTAssertEqual(join(["We need to bring the.", "Report to the meeting."]), "We need to bring the Report to the meeting.",
+                       "no sentence ends with \"the\"; an unknown capital may be a name, so it stays")
+        XCTAssertEqual(join(["We finished the API and the.", "Settings screen."]), "We finished the API and the Settings screen.")
+        XCTAssertEqual(join(["We should ship it in three days.", "And then tell the team."]),
+                       "We should ship it in three days and then tell the team.")
+        XCTAssertEqual(join(["I was thinking about the.", "The second option."]), "I was thinking about the the second option.")
+        XCTAssertEqual(join(["Move the button", "So it lines up."]), "Move the button so it lines up.")
+        XCTAssertEqual(join(["Send it,", "Then wait."]), "Send it, then wait.")
+    }
+
+    func testSegmentJoinKeepsRealSentenceEndsNamesAndAbbreviations() {
+        let join = VoiceDictationTextPipeline.joinSegments
+        XCTAssertEqual(join(["The build passed.", "So we can ship it today."]), "The build passed. So we can ship it today.")
+        XCTAssertEqual(join(["We flew to", "Paris on Monday."]), "We flew to Paris on Monday.")
+        XCTAssertEqual(join(["Then", "I left."]), "Then I left.")
+        XCTAssertEqual(join(["Bring snacks, e.g.", "And drinks."]), "Bring snacks, e.g. And drinks.")
+        XCTAssertEqual(join(["Ask Dr.", "And Mrs. Lee."]), "Ask Dr. And Mrs. Lee.")
+        XCTAssertEqual(join(["She said \"stop.\"", "And left."]), "She said \"stop.\" And left.")
+        XCTAssertEqual(join(["Is it ready?", "And tested?"]), "Is it ready? And tested?")
+        XCTAssertEqual(join(["Wait...", "And see."]), "Wait... And see.")
+        XCTAssertEqual(join(["", "Only one."]), "Only one.")
+        XCTAssertEqual(join(["The build is green.", "With that done, let's move on."]),
+                       "The build is green. With that done, let's move on.")
+        XCTAssertEqual(join(["That's what he said.", "Of course, I disagreed."]),
+                       "That's what he said. Of course, I disagreed.")
+        XCTAssertEqual(join(["The build passed.", "Which tests ran?"]), "The build passed. Which tests ran?")
+    }
+
+    func testRemovingHesitationsLeavesCleanPunctuation() {
+        let strip = VoiceDictationTextPipeline.removingHesitations
+        XCTAssertEqual(strip("Um, so we're going to ship it."), "So we're going to ship it.")
+        XCTAssertEqual(strip("so, um. Maybe later."), "so. Maybe later.")
+        XCTAssertEqual(strip("so. Um. Maybe later."), "so. Maybe later.")
+        XCTAssertEqual(strip("I think uh we should go, uh."), "I think we should go.")
+        XCTAssertEqual(strip("It was, erm, fine, uhh"), "It was, fine,")
+        XCTAssertEqual(strip("Ummm. I'm in."), "I'm in.")
+        XCTAssertEqual(strip("The umbrella and the uhaul stay."), "The umbrella and the uhaul stay.")
+        XCTAssertEqual(strip("Bring:\n  - um, sunscreen\n  - Uh, water\n\nThanks."), "Bring:\n  - sunscreen\n  - Water\n\nThanks.")
+    }
+
     func testJoinInsertsSingleSpacesAndHugsPunctuation() {
         XCTAssertEqual(
             VoiceDictationTextPipeline.join(["Send it to", "1 Infinite Loop", ", please."]),

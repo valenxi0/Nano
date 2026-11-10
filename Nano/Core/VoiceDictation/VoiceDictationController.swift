@@ -1127,7 +1127,9 @@ final class VoiceDictationController: ObservableObject {
     }
 
     /// Long dictations are cut at a pause once this much audio is waiting,
-    /// and the piece is transcribed and cleaned while the user keeps talking.
+    /// and the piece is recognized while the user keeps talking. Cleanup
+    /// waits for the whole dictation, so S1-mini sees both sides of every
+    /// pause and a pause never ends a sentence.
     nonisolated static let earlySegmentMinimumSeconds = 12.0
     /// Only the most recent stretch is searched for a pause, so the cut lands
     /// close to "now" and the search stays cheap as the recording grows.
@@ -1362,8 +1364,8 @@ final class VoiceDictationController: ObservableObject {
     }
 
     /// While recording, cuts finished stretches of a long dictation at a
-    /// pause and processes them in order, so on release only the last few
-    /// seconds are left to do.
+    /// pause and recognizes them in order, so on release only the last few
+    /// seconds are left to recognize.
     private func startSegmentMonitor(generation: UInt64) {
         segmentMonitor?.cancel()
         segmentMonitor = Task { [weak self] in
@@ -1398,7 +1400,7 @@ final class VoiceDictationController: ObservableObject {
             // the transcript is stitched by position.
             _ = try? await previous?.value
             guard let self else { throw CancellationError() }
-            return try await self.processSegment(samples, recipe: recipe, generation: generation)
+            return try await self.recognize(samples, recipe: recipe, generation: generation)
         })
     }
 
@@ -1592,14 +1594,28 @@ final class VoiceDictationController: ObservableObject {
         return (recognizer, cleaner)
     }
 
-    /// Recognition plus every text stage for one stretch of audio.
-    ///
-    /// Snippets are cut out before any rewriting and spliced back verbatim.
-    /// Speech is then cleaned by S1-mini (English only, never in a terminal)
-    /// or, without a cleaner, has its numbers written as figures; a terminal
-    /// also gets command formatting. Vocabulary runs last so nothing re-cases
-    /// a term.
+    /// Recognition plus every text stage for one stretch of audio. Sketch
+    /// uses it for each screenshot's words; a dictation recognizes its
+    /// pieces first and runs the text stages once over all of them.
     private func processSegment(
+        _ samples: [Float],
+        recipe: Recipe,
+        generation: UInt64
+    ) async throws -> SegmentOutput {
+        let isCurrent = { [weak self] in self?.sessionGeneration == generation }
+        let recognition = try await recognize(samples, recipe: recipe, generation: generation)
+        var processed = try await processText(
+            recognition.raw, language: recognition.language, recipe: recipe, isCurrent: isCurrent
+        )
+        processed.transcription = recognition.transcription
+        processed.modelLoad = recognition.modelLoad
+        processed.wasColdStart = recognition.wasColdStart
+        processed.boostedTerms = recognition.boostedTerms
+        return processed
+    }
+
+    /// Recognition alone: `raw`, the reported language and timings.
+    private func recognize(
         _ samples: [Float],
         recipe: Recipe,
         generation: UInt64
@@ -1627,17 +1643,19 @@ final class VoiceDictationController: ObservableObject {
         output.transcription = Self.seconds(transcribeStart.duration(to: clock.now))
         try Task.checkCancellation()
         guard isCurrent() else { throw CancellationError() }
-        var processed = try await processText(
-            recognition.text, language: recognition.language, recipe: recipe, isCurrent: isCurrent
-        )
-        processed.transcription = output.transcription
-        processed.modelLoad = output.modelLoad
-        processed.wasColdStart = output.wasColdStart
-        processed.boostedTerms = recognition.boostedTerms
-        return processed
+        output.raw = recognition.text
+        output.language = recognition.language
+        output.boostedTerms = recognition.boostedTerms
+        return output
     }
 
     /// Every text stage after recognition, for one stretch of speech.
+    ///
+    /// Snippets are cut out before any rewriting and spliced back verbatim.
+    /// Speech is then cleaned by S1-mini (English only, never in a terminal)
+    /// or, without a cleaner, has its numbers written as figures; a terminal
+    /// also gets command formatting. Vocabulary runs last so nothing re-cases
+    /// a term.
     private func processText(
         _ recognized: String,
         language: String?,
@@ -1746,31 +1764,36 @@ final class VoiceDictationController: ObservableObject {
                     tail = []
                 }
             }
-            var outputs: [SegmentOutput] = []
+            var recognitions: [SegmentOutput] = []
             for task in earlySegments {
-                outputs.append(try await task.value)
+                recognitions.append(try await task.value)
             }
-            if Self.containsSpeech(tail) || outputs.isEmpty {
-                outputs.append(try await processSegment(tail, recipe: recipe, generation: generation))
+            if Self.containsSpeech(tail) || recognitions.isEmpty {
+                recognitions.append(try await recognize(tail, recipe: recipe, generation: generation))
             }
             try Task.checkCancellation()
             guard isCurrent() else { throw CancellationError() }
 
-            let raw = VoiceDictationTextPipeline.join(outputs.map(\.raw))
+            let raw = VoiceDictationTextPipeline.joinSegments(recognitions.map(\.raw))
             guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   !Self.isLikelyHallucination(raw, samples: samples)
             else {
                 throw VoiceDictationError.noSpeech
             }
+            let output = try await processText(
+                raw, language: recognitions.compactMap(\.language).first, recipe: recipe, isCurrent: isCurrent
+            )
+            try Task.checkCancellation()
+            guard isCurrent() else { throw CancellationError() }
 
             let postStart = clock.now
-            let finished = Self.finish(VoiceDictationTextPipeline.join(outputs.map(\.text)), recipe: recipe)
+            let finished = Self.finish(output.text, recipe: recipe)
             let finalText = finished.text
             metrics.postProcessing = Self.seconds(postStart.duration(to: clock.now))
-            metrics.transcription = outputs.reduce(0) { $0 + $1.transcription }
-            metrics.cleanup = outputs.reduce(0) { $0 + $1.cleanup }
-            metrics.modelLoad = outputs.reduce(0) { $0 + $1.modelLoad }
-            metrics.wasColdStart = outputs.contains(where: \.wasColdStart)
+            metrics.transcription = recognitions.reduce(0) { $0 + $1.transcription }
+            metrics.cleanup = output.cleanup
+            metrics.modelLoad = recognitions.reduce(0) { $0 + $1.modelLoad }
+            metrics.wasColdStart = recognitions.contains(where: \.wasColdStart)
 
             guard !finalText.isEmpty || finished.pressEnter else { throw VoiceDictationError.noSpeech }
             let targetApp = pasteTarget.capturedApplication
@@ -1779,16 +1802,16 @@ final class VoiceDictationController: ObservableObject {
                 rawTranscript: raw,
                 finalText: finalText,
                 engine: recipe.engine,
-                cleanupApplied: outputs.contains(where: \.cleaned),
-                appliedReplacements: outputs.flatMap(\.applied),
+                cleanupApplied: output.cleaned,
+                appliedReplacements: output.applied,
                 metrics: metrics,
                 completedAt: Date(),
                 cleanupLevel: recipe.cleanupLevel,
-                guardedChunks: outputs.reduce(0) { $0 + $1.guardedChunks },
-                cleanupFallbacks: outputs.reduce(0) { $0 + $1.cleanupFallbacks },
-                language: outputs.compactMap(\.language).first,
+                guardedChunks: output.guardedChunks,
+                cleanupFallbacks: output.cleanupFallbacks,
+                language: output.language,
                 appContext: recipe.context,
-                boostedTerms: outputs.flatMap(\.boostedTerms),
+                boostedTerms: recognitions.flatMap(\.boostedTerms),
                 segmentsProcessedEarly: earlySegments.count
             )
             // The clipboard holds the text before any paste is tried, so a

@@ -30,10 +30,10 @@ final class VoiceDictationCleanupTests: XCTestCase {
 
     func testStylesMapToDirectives() {
         XCTAssertNil(VoiceDictationCleanupLevel.verbatim.directive(), "only Verbatim skips the cleaner")
-        XCTAssertEqual(VoiceDictationCleanupLevel.light.directive(), .init(styling: .casual))
+        XCTAssertEqual(VoiceDictationCleanupLevel.light.directive(), .init(styling: .semiCasual))
         XCTAssertEqual(VoiceDictationCleanupLevel.full.directive(), .polished, "Polished is the original control line")
         XCTAssertEqual(VoiceDictationCleanupLevel.full.directive(lists: true), .init(styling: .semiFormal, structure: .lists))
-        XCTAssertEqual(VoiceDictationCleanupLevel.light.directive(lists: true), .init(styling: .casual), "lists only with Polished")
+        XCTAssertEqual(VoiceDictationCleanupLevel.light.directive(lists: true), .init(styling: .semiCasual), "lists only with Polished")
     }
 
     func testListsAndEmailAdjustTheSentenceStylesOnly() {
@@ -44,7 +44,7 @@ final class VoiceDictationCleanupTests: XCTestCase {
         XCTAssertEqual(VoiceDictationCleanupLevel.full.directive(context: .chat), .polished)
         XCTAssertEqual(
             VoiceDictationCleanupLevel.light.directive(context: .email),
-            .init(styling: .casual),
+            .init(styling: .semiCasual),
             "Casual is a text message whatever the app"
         )
         XCTAssertNil(VoiceDictationCleanupLevel.verbatim.directive(lists: true, context: .email))
@@ -145,6 +145,39 @@ final class VoiceDictationCleanupTests: XCTestCase {
         XCTAssertEqual(verdict.text, raw)
         XCTAssertEqual(verdict.reason, .negationDropped(raw: 1, cleaned: 0))
         XCTAssertTrue(verdict.restoredRaw)
+    }
+
+    func testAStutteredNegationCountsOnce() {
+        XCTAssertEqual(VoiceDictationCleanupGuard.negationCount("I'm not, I'm not going"), 1)
+        XCTAssertEqual(VoiceDictationCleanupGuard.negationCount("not, not yet"), 1)
+        XCTAssertEqual(VoiceDictationCleanupGuard.negationCount("I'm not going and I'm not staying"), 2)
+        XCTAssertNil(VoiceDictationCleanupGuard.verify(raw: "I'm not, I'm not going.", cleaned: "I'm not going.").reason)
+    }
+
+    func testRestoresOnlyTheSentenceThatLostANegation() {
+        let raw = "Um, so the build passed on Friday. I'd prefer to never merge this branch. Let's tell the whole team tomorrow morning."
+        let cleaned = "The build passed on Friday.\n\nI'd prefer to merge this branch. Let's tell the whole team tomorrow morning."
+        let verdict = VoiceDictationCleanupGuard.verify(raw: raw, cleaned: cleaned)
+        XCTAssertEqual(verdict.reason, .negationDropped(raw: 1, cleaned: 0))
+        XCTAssertEqual(
+            verdict.text,
+            "The build passed on Friday.\n\nI'd prefer to never merge this branch. Let's tell the whole team tomorrow morning."
+        )
+    }
+
+    func testRestoresOnlyTheBlockWithAnUnspokenFigure() {
+        let raw = "The meeting is at four thirty. We should invite the whole design team."
+        let cleaned = "The meeting is at 5:30. We should invite the whole design team."
+        let verdict = VoiceDictationCleanupGuard.verify(raw: raw, cleaned: cleaned)
+        XCTAssertEqual(verdict.reason, .numberChanged("5"))
+        XCTAssertEqual(verdict.text, "The meeting is at four thirty. We should invite the whole design team.")
+    }
+
+    func testMergedSentencesStayTogetherWhenRestored() {
+        // S1 merged the two raw sentences into one; the guard cannot split it.
+        let raw = "I'd never merge this. Without a review."
+        let verdict = VoiceDictationCleanupGuard.verify(raw: raw, cleaned: "I'd merge this without a review.")
+        XCTAssertEqual(verdict.text, raw)
     }
 
     func testKeepsCleanedTextWhenNegationsSurvive() {

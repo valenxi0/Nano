@@ -225,8 +225,9 @@ enum VoiceDictationCleanupLevel: String, CaseIterable, Identifiable, Codable, Se
     /// No S1-mini. Punctuation and casing come from the recognizer; every
     /// word the user said stays, including fillers and list numbering.
     case verbatim
-    /// S1-mini in its casual register, which writes like a text message:
-    /// lowercase, little punctuation, hesitations left in.
+    /// S1-mini in its semi-casual register: relaxed, keeping apostrophes,
+    /// names and "I" (its casual register lowercases everything and turns
+    /// "we're" into "were"). "Um" and "uh", which it keeps, are removed after.
     case light
     /// S1-mini in its semi-formal register. The original behavior.
     case full
@@ -245,7 +246,7 @@ enum VoiceDictationCleanupLevel: String, CaseIterable, Identifiable, Codable, Se
     var shortDetail: String {
         switch self {
         case .verbatim: "Every word as said, punctuated by the recognizer"
-        case .light: "Like a text message, lowercase and light punctuation"
+        case .light: "Relaxed, your wording as spoken, without um and uh"
         case .full: "Removes fillers, writes numbers, punctuates sentences"
         }
     }
@@ -255,7 +256,7 @@ enum VoiceDictationCleanupLevel: String, CaseIterable, Identifiable, Codable, Se
         case .verbatim:
             "Keeps every word you said. Punctuation and capitalization only, straight from the recognizer. Lists keep the numbers you spoke."
         case .light:
-            "Writes like a text message: lowercase, light punctuation, your wording left as spoken. Corrections are still resolved and numbers written as figures."
+            "Relaxed, like a message to a friend: your wording left as spoken, without um and uh. Corrections are still resolved and numbers written as figures."
         case .full:
             "Removes fillers and false starts, writes numbers, dates, and emails properly, and punctuates as sentences. The default."
         }
@@ -272,7 +273,7 @@ enum VoiceDictationCleanupLevel: String, CaseIterable, Identifiable, Codable, Se
         var directive: VoiceDictationCleanupDirective
         switch self {
         case .verbatim: return nil
-        case .light: directive = VoiceDictationCleanupDirective(styling: .casual)
+        case .light: directive = VoiceDictationCleanupDirective(styling: .semiCasual)
         case .full: directive = .polished
         }
         if lists, self == .full { directive.structure = .lists }

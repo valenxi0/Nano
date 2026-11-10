@@ -225,23 +225,25 @@ enum VoiceDictationSketchText {
         }
         var lines: [[String]] = Array(repeating: [], count: frames.count)
         var current = 0
-        var previous = ""
+        var previous: Int?
         for (index, raw) in pieces.enumerated() {
             if index > 0 {
                 for anchorIndex in cuts[index - 1].marks where anchorIndex < anchors.count {
                     let anchor = anchors[anchorIndex]
                     if anchor.frame != current {
                         current = anchor.frame
-                        previous = ""
+                        previous = nil
                     }
                     if let label = anchor.label { lines[current].append(label) }
                 }
             }
             var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { continue }
-            if continuesSentence(previous) { text = lowercasingFirstWord(text) }
+            if let previous {
+                (lines[current][previous], text) = VoiceDictationTextPipeline.seam(lines[current][previous], text)
+            }
+            previous = lines[current].count
             lines[current].append(text)
-            previous = text
         }
         var lastPlace: String?
         return frames.enumerated().map { index, frame in
@@ -277,21 +279,6 @@ enum VoiceDictationSketchText {
     nonisolated static func clock(_ seconds: Double) -> String {
         let whole = max(0, Int(seconds.rounded(.down)))
         return String(format: "%d:%02d", whole / 60, whole % 60)
-    }
-
-    nonisolated private static func continuesSentence(_ text: String) -> Bool {
-        guard let last = text.trimmingCharacters(in: .whitespacesAndNewlines).last else { return false }
-        return !".!?:…".contains(last)
-    }
-
-    /// "This" becomes "this"; "I", "NASA" and "McDonald" stay.
-    nonisolated private static func lowercasingFirstWord(_ text: String) -> String {
-        let word = text.prefix { !$0.isWhitespace && $0 != "," && $0 != "." }
-        guard word.count > 1, let first = word.first, first.isUppercase,
-              word.dropFirst().allSatisfy({ !$0.isUppercase }),
-              !word.hasPrefix("I'"), !word.hasPrefix("I’")
-        else { return text }
-        return first.lowercased() + text.dropFirst()
     }
 }
 
