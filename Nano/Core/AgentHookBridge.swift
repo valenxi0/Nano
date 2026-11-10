@@ -1,5 +1,8 @@
 import CryptoKit
 import Foundation
+import os
+
+private let hookSocketLog = Logger(subsystem: "com.nanoapp.Nano", category: "hooks")
 
 // Agents push their own events to Nano instead of Nano hunting through logs.
 //
@@ -221,6 +224,8 @@ final class AgentHookBridge: ObservableObject {
         let parentSessionID: String
         /// Whitespace-collapsed opening of the brief.
         let brief: String
+        /// The delegating tool call, when the hook names it.
+        var callID: String? = nil
         let at: Date
     }
 
@@ -264,16 +269,21 @@ final class AgentHookBridge: ObservableObject {
     /// Nano's own entries is safe to do silently; the fingerprint below keeps
     /// this a stat of two files instead of an app-server spawn every minute.
     private var codexTrustTask: Task<Void, Never>?
+    private var socketWatchTask: Task<Void, Never>?
     private var lastCodexTrustFingerprint: String?
 
     // MARK: - Lifecycle
 
     func start() {
-        guard !isListening else { return }
         // The test host is this same app and shares Application Support. A
         // bridge started there took the socket path from the installed Nano,
         // which then heard no hooks until it was relaunched.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        // SO_NOSIGPIPE alone did not stop a reply to a hung-up client from
+        // killing Nano; a failed write must be an error, never a signal.
+        signal(SIGPIPE, SIG_IGN)
+        watchSocket()
+        guard !isListening else { return }
         token = Self.loadOrCreateToken()
 
         guard let socketPath = try? Self.socketPath() else { return }
@@ -306,9 +316,37 @@ final class AgentHookBridge: ObservableObject {
         pending.removeAll()
         activeWaiters.forEach { $0.resume(returning: nil) }
         server.stop()
+        socketWatchTask?.cancel()
+        socketWatchTask = nil
         codexTrustTask?.cancel()
         codexTrustTask = nil
         isListening = false
+    }
+
+    /// Binding can fail at launch while the Nano being replaced still holds
+    /// the socket, and the socket file can be unlinked under a running Nano.
+    /// Either way hooks stop arriving while transcript scans keep rows alive,
+    /// so it goes unnoticed: subagents stop folding and cards stop. Retry
+    /// until bound, and rebind when nothing answers on the path any more.
+    private func watchSocket() {
+        guard socketWatchTask == nil else { return }
+        socketWatchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                guard let self, !Task.isCancelled else { return }
+                if self.isListening {
+                    guard let path = try? Self.socketPath() else { continue }
+                    let answering = await Task.detached { HookSocketServer.isAnswering(at: path) }.value
+                    guard !Task.isCancelled, self.isListening, !answering else { continue }
+                    hookSocketLog.error("hook socket stopped answering; rebinding")
+                    self.server.stop()
+                    self.isListening = false
+                } else {
+                    hookSocketLog.info("hook socket not bound; retrying")
+                }
+                self.start()
+            }
+        }
     }
 
     // MARK: - Codex hook trust
@@ -865,9 +903,15 @@ final class AgentHookBridge: ObservableObject {
               let input = (event["tool_input"] as? [String: Any]) ?? (event["toolInput"] as? [String: Any]),
               let brief = Self.delegationBrief(tool: tool, input: input)
         else { return }
-        let key = parentID + "\u{0}" + brief
+        // One tool call sends a pre- and a post-tool event. Briefs are not a
+        // key: a host's boilerplate can open many of them the same way.
+        let callID = (event["tool_use_id"] as? String) ?? (event["toolUseId"] as? String)
+        let key = parentID + "\u{0}" + (callID ?? brief)
         guard !linkedDelegations.contains(key),
-              !pendingDelegations.contains(where: { $0.parentSessionID == parentID && $0.brief == brief })
+              !pendingDelegations.contains(where: { pending in
+                  pending.parentSessionID == parentID
+                      && (callID.map { pending.callID == $0 } ?? (pending.brief == brief))
+              })
         else { return }
         unclaimedFirstPrompts.removeAll { now.timeIntervalSince($0.at) > Self.delegationWindow }
         if let index = unclaimedFirstPrompts.lastIndex(where: {
@@ -878,7 +922,7 @@ final class AgentHookBridge: ObservableObject {
             return
         }
         pendingDelegations.removeAll { now.timeIntervalSince($0.at) > Self.delegationWindow }
-        pendingDelegations.append(PendingDelegation(parentSessionID: parentID, brief: brief, at: now))
+        pendingDelegations.append(PendingDelegation(parentSessionID: parentID, brief: brief, callID: callID, at: now))
         pendingDelegations = Array(pendingDelegations.suffix(50))
     }
 
@@ -930,7 +974,7 @@ final class AgentHookBridge: ObservableObject {
             link(
                 child: sessionID,
                 to: delegation.parentSessionID,
-                delegation: delegation.parentSessionID + "\u{0}" + delegation.brief
+                delegation: delegation.parentSessionID + "\u{0}" + (delegation.callID ?? delegation.brief)
             )
             return delegation.parentSessionID
         }
@@ -1073,7 +1117,12 @@ final class AgentHookBridge: ObservableObject {
         if trimmed == "Tool loaded." { return true }
         // Claude Code's note on a screenshot it scaled down, alone.
         if trimmed.hasPrefix("[Image: original "), trimmed.hasSuffix("]"), !trimmed.contains("\n") { return true }
-        return trimmed.hasPrefix("[SYSTEM NOTIFICATION")
+        return trimmed.hasPrefix("[SYSTEM NOTIFICATION") || isDelegationReport(trimmed)
+    }
+
+    /// T3 wakes a parent with its child's result as a prompt of its own.
+    nonisolated static func isDelegationReport(_ text: String) -> Bool {
+        text.hasPrefix("Delegated task node:delegated-task:")
     }
 
     /// Hook payload names differ, but all supported agents expose the prompt
@@ -2481,23 +2530,35 @@ private final class HookSocketServer: @unchecked Sendable {
 
     private var descriptor: Int32 = -1
     private var socketPath: String?
+    /// The socket file this server created, so `stop()` never unlinks one
+    /// another Nano bound at the same path since.
+    private var boundInode: ino_t = 0
     private let queue = DispatchQueue(
         label: "com.nanoapp.hook-socket",
         qos: .utility,
         attributes: .concurrent
     )
-    private var running = false
+    /// Bumped on every start and stop. An accept loop serves only its own
+    /// generation, so a restart never leaves the old loop on a reused descriptor.
+    private let generationLock = NSLock()
+    private var generation = 0
 
     @discardableResult
     func start(at path: String) -> Bool {
         stop()
         // Another Nano already answering here keeps its socket. Unlinking it
         // would leave that instance deaf with no way to notice.
-        guard !Self.isAnswering(at: path) else { return false }
+        guard !Self.isAnswering(at: path) else {
+            hookSocketLog.info("hook socket held by another process; will retry")
+            return false
+        }
         unlink(path)
 
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else { return false }
+        guard fd >= 0 else {
+            hookSocketLog.error("hook socket() failed: errno \(errno)")
+            return false
+        }
 
         var address = sockaddr_un()
         address.sun_family = sa_family_t(AF_UNIX)
@@ -2513,21 +2574,28 @@ private final class HookSocketServer: @unchecked Sendable {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, size) }
         }
         guard bound == 0, listen(fd, 16) == 0 else {
+            hookSocketLog.error("hook socket bind/listen failed: errno \(errno)")
             close(fd)
             return false
         }
 
         chmod(path, 0o600)
+        var info = stat()
+        boundInode = stat(path, &info) == 0 ? info.st_ino : 0
         descriptor = fd
         socketPath = path
-        running = true
-        queue.async { [weak self] in self?.acceptLoop(fd) }
+        let current = generationLock.withLock {
+            generation += 1
+            return generation
+        }
+        queue.async { [weak self] in self?.acceptLoop(fd, generation: current) }
+        hookSocketLog.notice("hook socket listening")
         return true
     }
 
     /// True when a live server accepts connections on `path`. A leftover
     /// socket file from a process that died refuses them.
-    private static func isAnswering(at path: String) -> Bool {
+    static func isAnswering(at path: String) -> Bool {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return false }
         defer { close(fd) }
@@ -2546,26 +2614,43 @@ private final class HookSocketServer: @unchecked Sendable {
     }
 
     func stop() {
-        running = false
+        generationLock.withLock { generation += 1 }
         if descriptor >= 0 {
             close(descriptor)
             descriptor = -1
         }
         if let socketPath {
-            unlink(socketPath)
+            var info = stat()
+            if stat(socketPath, &info) == 0, info.st_ino == boundInode {
+                unlink(socketPath)
+            }
             self.socketPath = nil
         }
     }
 
-    private func acceptLoop(_ fd: Int32) {
-        while running {
+    private func isCurrent(_ loop: Int) -> Bool {
+        generationLock.withLock { generation == loop }
+    }
+
+    private func acceptLoop(_ fd: Int32, generation loop: Int) {
+        while isCurrent(loop) {
             let client = accept(fd, nil, nil)
             guard client >= 0 else {
-                if !running { return }
-                // Out of descriptors (EMFILE) fails at once; without a pause
-                // this loop pins a core until one frees up.
-                usleep(50_000)
-                continue
+                let error = errno
+                guard isCurrent(loop) else { return }
+                switch error {
+                case EINTR, ECONNABORTED:
+                    continue
+                case EMFILE, ENFILE:
+                    // Out of descriptors fails at once; without a pause this
+                    // loop pins a core until one frees up.
+                    hookSocketLog.error("hook socket out of descriptors")
+                    usleep(50_000)
+                    continue
+                default:
+                    hookSocketLog.error("hook socket accept failed: errno \(error); loop ends")
+                    return
+                }
             }
             // Concurrent, so one waiting permission prompt cannot stall the
             // liveness events arriving behind it.
@@ -2579,6 +2664,9 @@ private final class HookSocketServer: @unchecked Sendable {
         // late `send` raises SIGPIPE and terminates Nano.
         var noSigPipe: Int32 = 1
         setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
+        // A client that never finishes its line must not hold a worker forever.
+        var readTimeout = timeval(tv_sec: 10, tv_usec: 0)
+        setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &readTimeout, socklen_t(MemoryLayout<timeval>.size))
 
         var buffer = [UInt8](repeating: 0, count: 65_536)
         var data = Data()
@@ -2590,8 +2678,9 @@ private final class HookSocketServer: @unchecked Sendable {
             if data.count > 4_000_000 { break }
         }
 
-        guard !data.isEmpty,
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        // A liveness probe connects and hangs up without a request.
+        guard !data.isEmpty else { return }
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               (object["token"] as? String) == expectedToken,
               let onEvent
         else {

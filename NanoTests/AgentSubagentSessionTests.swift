@@ -77,6 +77,43 @@ final class AgentSubagentSessionTests: XCTestCase {
     }
 
     @MainActor
+    func testRepeatDelegationWithTheSameOpeningLinksItsOwnChild() async throws {
+        let parent = "parent-\(UUID().uuidString)"
+        let first = "child-\(UUID().uuidString)"
+        let second = "child-\(UUID().uuidString)"
+        let store = links()
+        let bridge = bridge(store)
+        // Same 300-character preamble, different work after it.
+        let preamble = String(repeating: "Read the shared brief first and follow it. ", count: 10)
+
+        try await send(bridge, "UserPromptSubmit", session: parent, extra: ["prompt": "plan the units"])
+        for (child, call, unit) in [(first, "toolu_1", "unit one"), (second, "toolu_2", "unit two")] {
+            var pre = delegation(preamble + unit)
+            pre["tool_use_id"] = call
+            try await send(bridge, "PreToolUse", session: parent, extra: pre)
+            try await send(bridge, "PostToolUse", session: parent, extra: pre)
+            try await send(bridge, "UserPromptSubmit", session: child, extra: ["prompt": preamble + unit])
+        }
+
+        XCTAssertEqual(store.parent(of: first), parent)
+        XCTAssertEqual(store.parent(of: second), parent)
+        XCTAssertTrue(bridge.pendingDelegations.isEmpty)
+    }
+
+    @MainActor
+    func testT3ResultWakeUpIsNotTheUsersPrompt() async throws {
+        let parent = "parent-\(UUID().uuidString)"
+        let bridge = bridge(links())
+
+        try await send(bridge, "UserPromptSubmit", session: parent, extra: ["prompt": "build the fix"])
+        try await send(bridge, "UserPromptSubmit", session: parent, extra: [
+            "prompt": "Delegated task node:delegated-task:command%3Amcp%3Aabc (Fix) [completed]:\nDone.",
+        ])
+
+        XCTAssertEqual(bridge.sessionStates[parent]?.lastUserPrompt, "build the fix")
+    }
+
+    @MainActor
     func testChildThatStartsBeforeTheDelegationArrivesIsStillLinked() async throws {
         let parent = "parent-\(UUID().uuidString)"
         let child = "child-\(UUID().uuidString)"

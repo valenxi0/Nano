@@ -5921,6 +5921,7 @@ enum AgentSessionParsers {
         // Claude Code's reply when a deferred tool's schema is loaded. It is
         // the harness talking, not the user.
         if trimmed == "Tool loaded." { return true }
+        if AgentHookBridge.isDelegationReport(trimmed) { return true }
         if isImageNote(trimmed) { return true }
         for marker in [
             "[SYSTEM NOTIFICATION", "Caveat:", "<system-reminder>",
