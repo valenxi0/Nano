@@ -908,14 +908,19 @@ private struct IslandSettingsPane: View {
     @ObservedObject var settings: NanoSettings
     @ObservedObject var viewModel: IslandViewModel
     @State private var focus: IslandPreviewFocus = .surface
+    @State private var showsAdvanced = false
+    @Environment(\.settingsHighlight) private var highlight
+
+    /// Rows inside Advanced, which search has to open before it can show them.
+    private static let advancedAnchors: Set<String> = ["island.width", "island.topOffset", "island.resetSize"]
 
     var body: some View {
         SettingsPage(
             title: "Island",
             symbol: SettingsDestination.island.symbol,
-            subtitle: "Shape and surface. The preview follows what you change."
+            subtitle: "Shape, size and surface. The preview follows what you change."
         ) {
-            IslandLivePreview(settings: settings, focus: focus)
+            IslandLivePreview(settings: settings, focus: focus, idleSize: viewModel.idleIslandSize)
 
             VStack(alignment: .leading, spacing: 18) {
                     SettingsSection {
@@ -930,6 +935,17 @@ private struct IslandSettingsPane: View {
                         .onHover { if $0 { focus = .shape } }
                         .settingsAnchor("island.shape")
 
+                        SettingsRow("Size") {
+                            Picker("Size", selection: $settings.islandGeometry.size) {
+                                ForEach(IslandSize.allCases) { Text($0.title).tag($0) }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.segmented)
+                            .fixedSize()
+                        }
+                        .onHover { if $0 { focus = .size } }
+                        .settingsAnchor("island.size")
+
                         SettingsRow("Surface") {
                             Picker("Surface", selection: $settings.appearance) {
                                 ForEach(IslandAppearance.allCases) { Text($0.title).tag($0) }
@@ -940,6 +956,60 @@ private struct IslandSettingsPane: View {
                         }
                         .onHover { if $0 { focus = .surface } }
                         .settingsAnchor("island.surface")
+                    }
+
+                    DisclosureGroup("Advanced", isExpanded: $showsAdvanced) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            SettingsSection {
+                                SettingsRow("Width") {
+                                    Slider(
+                                        value: $settings.islandGeometry.sideZone,
+                                        in: settings.islandGeometry.sideZoneRange,
+                                        step: 1
+                                    ) { editing in
+                                        if editing { focus = .width }
+                                    }
+                                    .labelsHidden()
+                                    .controlSize(.small)
+                                    .frame(width: 200)
+                                    Text("\(Int(viewModel.idleIslandSize.width.rounded())) pt")
+                                        .font(.system(size: 12, design: .rounded))
+                                        .monospacedDigit()
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 44, alignment: .trailing)
+                                }
+                                .onHover { if $0 { focus = .width } }
+                                .settingsAnchor("island.width")
+
+                                if settings.placement == .floating {
+                                    pointSliderRow(
+                                        "Distance from top",
+                                        value: $settings.islandGeometry.floatingTopOffset,
+                                        range: IslandGeometry.floatingTopOffsetRange,
+                                        focus: .topOffset
+                                    )
+                                    .settingsAnchor("island.topOffset")
+                                }
+                            }
+
+                            HStack {
+                                Spacer()
+                                Button("Reset Size and Position") { settings.resetIslandGeometry() }
+                                    .controlSize(.small)
+                                    .disabled(
+                                        settings.islandGeometry.sideZone == IslandGeometry.standard.sideZone(for: settings.islandGeometry.size)
+                                            && settings.islandGeometry.floatingTopOffset == IslandGeometry.standard.floatingTopOffset
+                                    )
+                            }
+                            .settingsAnchor("island.resetSize")
+                        }
+                        .padding(.top, 8)
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .settingsAnchor("island.advanced")
+                    .onChange(of: highlight, initial: true) { _, target in
+                        if let target, Self.advancedAnchors.contains(target) { showsAdvanced = true }
                     }
 
                     SettingsSection(settings.appearance.title) {
@@ -971,6 +1041,7 @@ private struct IslandSettingsPane: View {
                             .controlSize(.small)
                     }
                     .settingsAnchor("island.reset")
+
             }
         }
     }
@@ -1007,10 +1078,42 @@ private struct IslandSettingsPane: View {
         }
         .onHover { if $0 { focus = target } }
     }
+
+    /// A slider for a length, labelled in points rather than percent.
+    private func pointSliderRow(
+        _ title: String,
+        value: Binding<CGFloat>,
+        range: ClosedRange<CGFloat>,
+        focus target: IslandPreviewFocus
+    ) -> some View {
+        SettingsRow(title) {
+            Slider(value: value, in: range, step: 1) { editing in
+                if editing { focus = target }
+            }
+            .labelsHidden()
+            .controlSize(.small)
+            .frame(width: 200)
+            Text("\(Int(value.wrappedValue.rounded())) pt")
+                .font(.system(size: 12, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 44, alignment: .trailing)
+        }
+        .onHover { if $0 { focus = target } }
+    }
 }
 
 private enum IslandPreviewFocus {
     case shape, surface, surfaceColor, tint, opacity, glass, midpoint
+    case size, width, topOffset
+
+    /// Size rows preview the closed island, since that is what they change.
+    var showsIdleIsland: Bool {
+        switch self {
+        case .size, .width, .topOffset: true
+        default: false
+        }
+    }
 
     var title: String {
         switch self {
@@ -1021,6 +1124,9 @@ private enum IslandPreviewFocus {
         case .opacity: "Surface opacity"
         case .glass: "Glass intensity"
         case .midpoint: "Gradient midpoint"
+        case .size: "Size"
+        case .width: "Width"
+        case .topOffset: "Distance from top"
         }
     }
 
@@ -1033,6 +1139,9 @@ private enum IslandPreviewFocus {
         case .opacity: "Lower lets more of the wallpaper through."
         case .glass: "How strongly the glass blurs what's behind it."
         case .midpoint: "Where Hybrid's black gives way to glass."
+        case .size: "Mini keeps the icons and drops the words. Volume and brightness play inside it."
+        case .width: "How much room the closed island gives its icons. It never gets too narrow for them."
+        case .topOffset: "Nudges a floating island a few points up or down."
         }
     }
 }
@@ -1042,6 +1151,8 @@ private enum IslandPreviewFocus {
 private struct IslandLivePreview: View {
     @ObservedObject var settings: NanoSettings
     let focus: IslandPreviewFocus
+    /// The closed island's size on this display.
+    let idleSize: CGSize
 
     private var attached: Bool { settings.placement == .attached }
     private let sceneHeight: CGFloat = 230
@@ -1075,8 +1186,14 @@ private struct IslandLivePreview: View {
                     .background(Color.black.opacity(0.22))
                     Spacer()
                 }
-                island
-                    .padding(.top, attached ? 0 : 28)
+                Group {
+                    if focus.showsIdleIsland {
+                        idleIsland
+                    } else {
+                        island
+                    }
+                }
+                .padding(.top, attached ? 0 : 20 + settings.islandGeometry.floatingTopOffset)
             }
             .frame(maxWidth: .infinity)
             .frame(height: sceneHeight)
@@ -1088,6 +1205,8 @@ private struct IslandLivePreview: View {
             .environment(\.colorScheme, .dark)
             .accessibilityLabel("Island preview")
             .animation(.easeOut(duration: 0.25), value: settings.placement)
+            .animation(.easeOut(duration: 0.2), value: settings.islandGeometry)
+            .animation(.easeOut(duration: 0.25), value: focus.showsIdleIsland)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(focus.title)
@@ -1144,6 +1263,31 @@ private struct IslandLivePreview: View {
         .shadow(color: .black.opacity(0.4), radius: 20, y: 10)
         .scaleEffect(islandScale, anchor: .top)
         .frame(width: islandWidth, height: size.height * islandScale, alignment: .top)
+    }
+
+    /// The closed island at its chosen size. Drawn larger than the dashboard
+    /// preview so a few points of width or height are still visible.
+    private var idleIsland: some View {
+        let scale: CGFloat = 0.75
+        let radius = IslandHitGeometry.cornerRadius(expanded: false, mini: settings.islandGeometry.isMini)
+        let shape = attached
+            ? AnyShape(UnevenRoundedRectangle(bottomLeadingRadius: radius, bottomTrailingRadius: radius, style: .continuous))
+            : AnyShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        return IslandSurfaceBackground(
+            appearance: settings.appearance,
+            blackOpacity: settings.blackOpacity,
+            glassIntensity: settings.blurIntensity,
+            gradientMidpoint: settings.gradientMidpoint,
+            surfaceColor: settings.surfaceColor,
+            glassTintColor: settings.glassTintColor,
+            cornerRadius: radius
+        )
+        .frame(width: idleSize.width, height: idleSize.height)
+        .clipShape(shape)
+        .overlay { shape.stroke(Color.white.opacity(settings.appearance == .solidBlack ? 0.08 : 0.2), lineWidth: 1.2) }
+        .shadow(color: .black.opacity(0.34), radius: 9, y: 4)
+        .scaleEffect(scale, anchor: .top)
+        .frame(width: idleSize.width * scale, height: idleSize.height * scale, alignment: .top)
     }
 }
 

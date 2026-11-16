@@ -847,6 +847,139 @@ final class IslandStateTests: XCTestCase {
         XCTAssertFalse(IslandPhase.idleCompact.isExpanded)
     }
 
+    // MARK: Island size (issue #2)
+
+    @MainActor
+    private func islandSizeFixture(_ name: String) -> (NanoSettings, IslandViewModel, () -> Void) {
+        let suiteName = "NanoTests.\(name).\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let settings = NanoSettings(defaults: defaults)
+        return (settings, IslandViewModel(settings: settings), { defaults.removePersistentDomain(forName: suiteName) })
+    }
+
+    func testStandardIslandGeometryIsTheOriginalLook() {
+        let standard = IslandGeometry.standard
+        XCTAssertEqual(standard.size, .regular)
+        XCTAssertEqual(standard.floatingTopOffset, 8)
+        XCTAssertEqual(
+            standard.idleSize(notchWidth: 0, notchHeight: 0, attached: false),
+            IslandPhase.idleCompact.preferredSize
+        )
+        XCTAssertEqual(IslandHitGeometry.cornerRadius(expanded: false), 18)
+        XCTAssertEqual(IslandHitGeometry.cornerRadius(expanded: true), 28)
+        XCTAssertEqual(IslandHitGeometry.cornerRadius(expanded: true, hud: true), 22)
+    }
+
+    func testIslandGeometryKeepsEveryValueInRange() {
+        var geometry = IslandGeometry(size: .mini, regularSideZone: 10, miniSideZone: 500, floatingTopOffset: -5)
+        XCTAssertEqual(geometry.regularSideZone, IslandGeometry.regularSideZoneRange.lowerBound)
+        XCTAssertEqual(geometry.miniSideZone, IslandGeometry.miniSideZoneRange.upperBound)
+        XCTAssertEqual(geometry.floatingTopOffset, IslandGeometry.floatingTopOffsetRange.lowerBound)
+
+        geometry.sideZone = 0
+        XCTAssertEqual(geometry.miniSideZone, IslandGeometry.miniSideZoneRange.lowerBound, "Width moves the chosen size's sides")
+        XCTAssertEqual(geometry.regularSideZone, IslandGeometry.regularSideZoneRange.lowerBound)
+        geometry.miniSideZone = .nan
+        XCTAssertEqual(geometry.miniSideZone, IslandGeometry.miniSideZoneRange.lowerBound)
+        geometry.floatingTopOffset = 100
+        XCTAssertEqual(geometry.floatingTopOffset, IslandGeometry.floatingTopOffsetRange.upperBound)
+    }
+
+    @MainActor
+    func testRegularIslandKeepsItsSizeAndWidthMovesIt() {
+        let (settings, viewModel, cleanup) = islandSizeFixture("regularSize")
+        defer { cleanup() }
+        settings.placement = .floating
+        viewModel.notchWidth = 0
+        XCTAssertEqual(viewModel.preferredSize, CGSize(width: 360, height: 44), "Defaults leave the island as it was")
+
+        settings.placement = .attached
+        viewModel.notchWidth = 185
+        viewModel.notchHeight = 38
+        XCTAssertEqual(viewModel.preferredSize, CGSize(width: 185 + 132 * 2 + 44, height: 44), "And as it was around a notch")
+
+        settings.islandGeometry.sideZone = IslandGeometry.regularSideZoneRange.lowerBound
+        XCTAssertEqual(viewModel.preferredSize.width, 185 + 104 * 2 + 44)
+    }
+
+    @MainActor
+    func testMiniIslandIsSmallerAndNeverWidensForASong() {
+        let (settings, viewModel, cleanup) = islandSizeFixture("miniSize")
+        defer { cleanup() }
+        settings.placement = .floating
+        settings.islandGeometry.size = .mini
+        viewModel.notchWidth = 0
+        XCTAssertTrue(viewModel.showsMiniIsland)
+        XCTAssertEqual(viewModel.preferredSize, CGSize(width: 116, height: IslandGeometry.miniHeight))
+
+        settings.placement = .attached
+        viewModel.notchWidth = 185
+        viewModel.notchHeight = 38
+        let notched = viewModel.preferredSize
+        XCTAssertEqual(notched, CGSize(width: (44 + 10) * 2 + 185 + 20, height: 38), "Mini still covers the camera housing")
+        XCTAssertLessThan(notched.width, 185 + 132 * 2 + 44)
+
+        settings.islandGeometry.sideZone = IslandGeometry.miniSideZoneRange.lowerBound
+        XCTAssertGreaterThanOrEqual(viewModel.miniSideZoneWidth, 40, "Width never squeezes out the icons")
+    }
+
+    @MainActor
+    func testSmallHUDsPlayInsideMiniAndCardsDont() {
+        XCTAssertTrue(IslandNotification.preview(for: .volume).fitsMiniIsland)
+        XCTAssertTrue(IslandNotification.preview(for: .brightness).fitsMiniIsland)
+        XCTAssertTrue(IslandNotification.preview(for: .battery).fitsMiniIsland)
+        XCTAssertTrue(IslandNotification.preview(for: .bluetooth).fitsMiniIsland)
+        XCTAssertFalse(IslandNotification.preview(for: .agent).fitsMiniIsland, "Approvals need their full card")
+        XCTAssertFalse(IslandNotification.preview(for: .system).fitsMiniIsland)
+    }
+
+    @MainActor
+    func testIslandGeometryPersistsAndResetKeepsTheSize() {
+        let suiteName = "NanoTests.islandSizePersist.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let custom = IslandGeometry(size: .mini, regularSideZone: 120, miniSideZone: 56, floatingTopOffset: 12)
+
+        let settings = NanoSettings(defaults: defaults)
+        XCTAssertEqual(settings.islandGeometry, .standard)
+        settings.islandGeometry = custom
+        XCTAssertEqual(NanoSettings(defaults: defaults).islandGeometry, custom)
+
+        settings.resetIslandGeometry()
+        var expected = IslandGeometry.standard
+        expected.size = .mini
+        XCTAssertEqual(settings.islandGeometry, expected, "Reset puts width and gap back, not the size")
+        XCTAssertEqual(NanoSettings(defaults: defaults).islandGeometry, expected)
+    }
+
+    @MainActor
+    func testOutOfRangeStoredGeometryIsClampedOnLoad() {
+        let suiteName = "NanoTests.islandSizeClampLoad.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(5.0, forKey: "island.miniSideZone")
+        defaults.set(80.0, forKey: "island.floatingTopOffset")
+        defaults.set("huge", forKey: "island.size")
+
+        let geometry = NanoSettings(defaults: defaults).islandGeometry
+        XCTAssertEqual(geometry.size, .regular, "An unknown size falls back to Regular")
+        XCTAssertEqual(geometry.miniSideZone, IslandGeometry.miniSideZoneRange.lowerBound)
+        XCTAssertEqual(geometry.floatingTopOffset, IslandGeometry.floatingTopOffsetRange.upperBound)
+        XCTAssertEqual(geometry.regularSideZone, IslandGeometry.standard.regularSideZone)
+    }
+
+    func testHitPathFollowsTheMiniCorner() {
+        let rect = CGRect(x: 0, y: 0, width: 116, height: 30)
+        XCTAssertEqual(IslandHitGeometry.cornerRadius(expanded: false, mini: true), 14)
+        XCTAssertFalse(
+            IslandHitGeometry.contains(CGPoint(x: 1, y: 29), in: rect, placement: .floating, expanded: false, mini: true),
+            "Mini's rounded corner leaves the bounding-box corner outside"
+        )
+        XCTAssertTrue(
+            IslandHitGeometry.contains(CGPoint(x: 58, y: 15), in: rect, placement: .floating, expanded: false, mini: true)
+        )
+    }
+
     func testCompactAgentActivityGroupsSessionsByProvider() throws {
         let now = Date()
         var codexOne = AgentSession(
@@ -2749,6 +2882,21 @@ final class IslandStateTests: XCTestCase {
         settings.setEnabled(false, for: .cue)
         XCTAssertFalse(SettingsSearchItem.search("cue", settings: settings).contains { $0.destination == .cue },
                        "hidden pages aren't offered")
+    }
+
+    @MainActor
+    func testSettingsSearchFindsIslandSizeRows() {
+        let settings = NanoSettings(defaults: UserDefaults(suiteName: "nano-search-size-\(UUID().uuidString)")!)
+        settings.placement = .floating
+        XCTAssertTrue(SettingsSearchItem.search("mini", settings: settings).contains { $0.anchor == "island.size" })
+        XCTAssertTrue(SettingsSearchItem.search("width", settings: settings).contains { $0.anchor == "island.width" })
+        XCTAssertTrue(SettingsSearchItem.search("distance", settings: settings).contains { $0.anchor == "island.topOffset" })
+
+        settings.placement = .attached
+        XCTAssertFalse(
+            SettingsSearchItem.search("distance", settings: settings).contains { $0.anchor == "island.topOffset" },
+            "The top gap only exists for a floating island"
+        )
     }
 
     @MainActor

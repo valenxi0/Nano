@@ -428,6 +428,10 @@ final class IslandViewModel: ObservableObject {
            let card = onboardingIsland?.cardSize(notchClearance: notchContentClearance) {
             return card
         }
+        // Volume, brightness and the like play inside a Mini island.
+        if phase == .transientHUD, showsMiniIsland {
+            return idleIslandSize
+        }
         if phase == .transientHUD, let hud = notificationCenter.current {
             return hud.preferredSize(
                 notchWidth: notchWidth,
@@ -437,20 +441,11 @@ final class IslandViewModel: ObservableObject {
         }
 
         guard phase.isExpanded else {
-            let compact = phase.preferredSize
-            let flare: CGFloat = settings.placement == .attached ? 44 : 0
+            // Mini never widens by itself, not even to name a new song.
+            if showsMiniIsland { return idleIslandSize }
+            let idle = idleIslandSize
             let peek: CGFloat = mediaPeek == nil ? 0 : Self.mediaPeekWidth
-            guard notchWidth > 0 else {
-                return CGSize(width: compact.width + flare + peek, height: compact.height)
-            }
-            let layoutPadding: CGFloat = settings.placement == .attached ? 44 : 24
-            return CGSize(
-                width: max(
-                    compact.width + flare,
-                    notchWidth + compactSideZone * 2 + layoutPadding
-                ) + peek,
-                height: compact.height
-            )
+            return CGSize(width: idle.width + peek, height: idle.height)
         }
         let baseSize: CGSize
         guard let activeModule = displayedModule else {
@@ -648,7 +643,37 @@ final class IslandViewModel: ObservableObject {
     static let goalRowHeight: CGFloat = 22
     static let maxUnscrolledGoals = 6
 
-    var compactSideZone: CGFloat { 132 }
+    var compactSideZone: CGFloat { settings.islandGeometry.regularSideZone }
+
+    /// The closed island's size on this display, from Settings › Island.
+    var idleIslandSize: CGSize {
+        settings.islandGeometry.idleSize(
+            notchWidth: notchWidth,
+            notchHeight: notchHeight,
+            attached: settings.placement == .attached
+        )
+    }
+
+    /// Mini applies to the closed island and to the small HUDs (volume,
+    /// brightness, battery, Bluetooth, timer). Cards with something to read
+    /// or answer still open at full size.
+    var showsMiniIsland: Bool {
+        guard settings.islandGeometry.isMini else { return false }
+        switch phase {
+        case .idleCompact:
+            return onboardingIsland == nil
+        case .transientHUD:
+            return notificationCenter.current?.fitsMiniIsland == true
+        case .hoverDashboard, .pinnedDashboard, .dragTarget:
+            return false
+        }
+    }
+
+    /// Room for content on each side of a Mini island, beside the notch.
+    var miniSideZoneWidth: CGFloat {
+        let flare: CGFloat = settings.placement == .attached ? 20 : 0
+        return max((idleIslandSize.width - 18 - flare - notchWidth) / 2, 0)
+    }
 
     /// Expanded content can span the center, unlike compact and HUD layouts.
     /// Push it below the camera housing only on the display that reports one.
@@ -727,6 +752,7 @@ final class IslandViewModel: ObservableObject {
               Date() >= mediaPeekReadyAt,
               settings.musicAnnouncesTrackChanges,
               phase == .idleCompact,
+              !settings.islandGeometry.isMini,
               compactIslandShowsMusic
         else { return }
 

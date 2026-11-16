@@ -75,6 +75,105 @@ enum IslandAppearance: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 }
 
+/// How much the closed island shows. Mini keeps the icons and drops the words.
+enum IslandSize: String, CaseIterable, Identifiable, Codable, Sendable {
+    case regular
+    case mini
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .regular: "Regular"
+        case .mini: "Mini"
+        }
+    }
+}
+
+/// The closed island's size, how wide its sides are, and how far a floating
+/// island sits below the top edge. `standard` is the look Nano has always had,
+/// so nothing moves until someone changes a value.
+///
+/// Every value is kept inside its range as it is set or loaded. The ranges
+/// stay narrow on purpose: the side zones never get too small for the compact
+/// content they carry, and the gap only nudges the island.
+struct IslandGeometry: Equatable, Sendable {
+    static let regularSideZoneRange: ClosedRange<CGFloat> = 104...160
+    static let miniSideZoneRange: ClosedRange<CGFloat> = 40...64
+    static let floatingTopOffsetRange: ClosedRange<CGFloat> = 4...14
+    /// Mini's height where no notch sets it.
+    static let miniHeight: CGFloat = 30
+
+    static let standard = IslandGeometry(
+        size: .regular,
+        regularSideZone: 132,
+        miniSideZone: 44,
+        floatingTopOffset: 8
+    )
+
+    var size: IslandSize
+
+    var regularSideZone: CGFloat {
+        didSet { regularSideZone = Self.clamp(regularSideZone, to: Self.regularSideZoneRange) }
+    }
+
+    var miniSideZone: CGFloat {
+        didSet { miniSideZone = Self.clamp(miniSideZone, to: Self.miniSideZoneRange) }
+    }
+
+    var floatingTopOffset: CGFloat {
+        didSet { floatingTopOffset = Self.clamp(floatingTopOffset, to: Self.floatingTopOffsetRange) }
+    }
+
+    init(size: IslandSize, regularSideZone: CGFloat, miniSideZone: CGFloat, floatingTopOffset: CGFloat) {
+        // Property observers don't run in an initializer, so clamp here too.
+        self.size = size
+        self.regularSideZone = Self.clamp(regularSideZone, to: Self.regularSideZoneRange)
+        self.miniSideZone = Self.clamp(miniSideZone, to: Self.miniSideZoneRange)
+        self.floatingTopOffset = Self.clamp(floatingTopOffset, to: Self.floatingTopOffsetRange)
+    }
+
+    var isMini: Bool { size == .mini }
+
+    /// The side zone for the chosen size, which is what the Width slider moves.
+    var sideZone: CGFloat {
+        get { isMini ? miniSideZone : regularSideZone }
+        set { if isMini { miniSideZone = newValue } else { regularSideZone = newValue } }
+    }
+
+    func sideZone(for size: IslandSize) -> CGFloat {
+        size == .mini ? miniSideZone : regularSideZone
+    }
+
+    var sideZoneRange: ClosedRange<CGFloat> {
+        isMini ? Self.miniSideZoneRange : Self.regularSideZoneRange
+    }
+
+    /// The closed island on a display. Around a notch the side zones sit
+    /// either side of the camera housing, so the island always covers it.
+    func idleSize(notchWidth: CGFloat, notchHeight: CGFloat, attached: Bool) -> CGSize {
+        switch size {
+        case .regular:
+            let flare: CGFloat = attached ? 44 : 0
+            // 360 at the default side zone, the width Nano always had.
+            let body = regularSideZone * 2 + 96
+            guard notchWidth > 0 else { return CGSize(width: body + flare, height: 44) }
+            let padding: CGFloat = attached ? 44 : 24
+            return CGSize(width: max(body + flare, notchWidth + regularSideZone * 2 + padding), height: 44)
+        case .mini:
+            let flare: CGFloat = attached ? 20 : 0
+            let middle = notchWidth > 0 ? notchWidth : 8
+            let height = notchWidth > 0 ? max(notchHeight, Self.miniHeight) : Self.miniHeight
+            return CGSize(width: (miniSideZone + 10) * 2 + middle + flare, height: height)
+        }
+    }
+
+    private static func clamp(_ value: CGFloat, to range: ClosedRange<CGFloat>) -> CGFloat {
+        guard value.isFinite else { return range.lowerBound }
+        return min(max(value, range.lowerBound), range.upperBound)
+    }
+}
+
 enum NanoModuleID: String, CaseIterable, Identifiable, Codable, Sendable {
     case calendar
     case timer
@@ -226,6 +325,10 @@ final class NanoSettings: ObservableObject {
         static let appearance = "island.appearance"
         static let followActiveDisplay = "display.followActive"
         static let pinnedScreenID = "island.pinnedScreenID"
+        static let islandSize = "island.size"
+        static let regularSideZone = "island.regularSideZone"
+        static let miniSideZone = "island.miniSideZone"
+        static let floatingTopOffset = "island.floatingTopOffset"
         static let blackOpacity = "appearance.blackOpacity"
         static let blurIntensity = "appearance.blurIntensity"
         static let gradientMidpoint = "appearance.gradientMidpoint"
@@ -343,6 +446,18 @@ final class NanoSettings: ObservableObject {
             } else {
                 defaults.removeObject(forKey: Key.pinnedScreenID)
             }
+        }
+    }
+
+    /// Size, side zones and the floating gap, one key per value. Nothing is
+    /// written until a value first changes.
+    @Published var islandGeometry: IslandGeometry {
+        didSet {
+            guard islandGeometry != oldValue else { return }
+            defaults.set(islandGeometry.size.rawValue, forKey: Key.islandSize)
+            defaults.set(Double(islandGeometry.regularSideZone), forKey: Key.regularSideZone)
+            defaults.set(Double(islandGeometry.miniSideZone), forKey: Key.miniSideZone)
+            defaults.set(Double(islandGeometry.floatingTopOffset), forKey: Key.floatingTopOffset)
         }
     }
 
@@ -870,6 +985,18 @@ final class NanoSettings: ObservableObject {
         followActiveDisplay = defaults.object(forKey: Key.followActiveDisplay) == nil
             ? true
             : defaults.bool(forKey: Key.followActiveDisplay)
+        let standardGeometry = IslandGeometry.standard
+        // A local copy, so the closure doesn't capture `self` mid-initialization.
+        let store = defaults
+        let savedLength: (String, CGFloat) -> CGFloat = { key, fallback in
+            (store.object(forKey: key) as? NSNumber).map { CGFloat($0.doubleValue) } ?? fallback
+        }
+        islandGeometry = IslandGeometry(
+            size: defaults.string(forKey: Key.islandSize).flatMap(IslandSize.init(rawValue:)) ?? standardGeometry.size,
+            regularSideZone: savedLength(Key.regularSideZone, standardGeometry.regularSideZone),
+            miniSideZone: savedLength(Key.miniSideZone, standardGeometry.miniSideZone),
+            floatingTopOffset: savedLength(Key.floatingTopOffset, standardGeometry.floatingTopOffset)
+        )
         blackOpacity = defaults.object(forKey: Key.blackOpacity) == nil
             ? 0.92
             : defaults.double(forKey: Key.blackOpacity)
@@ -1211,6 +1338,14 @@ final class NanoSettings: ObservableObject {
         gradientMidpoint = 0.55
         surfaceColor = .black
         glassTintColor = .black
+    }
+
+    /// Width and gap back to their defaults. The chosen size stays, and shape
+    /// and surface have their own reset.
+    func resetIslandGeometry() {
+        var geometry = IslandGeometry.standard
+        geometry.size = islandGeometry.size
+        islandGeometry = geometry
     }
 
     func dashboardFeature(in area: DashboardArea) -> NanoModuleID? {

@@ -91,14 +91,18 @@ enum VoiceDictationCompactLayout {
 struct VoiceDictationCompactLeading: View {
     @ObservedObject var controller: VoiceDictationController
     let failureLabelPlacement: VoiceDictationFailureLabelPlacement
+    /// Mini shows the icon alone.
+    let showsTitle: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         controller: VoiceDictationController,
-        failureLabelPlacement: VoiceDictationFailureLabelPlacement = .leading
+        failureLabelPlacement: VoiceDictationFailureLabelPlacement = .leading,
+        showsTitle: Bool = true
     ) {
         self.controller = controller
         self.failureLabelPlacement = failureLabelPlacement
+        self.showsTitle = showsTitle
     }
 
     var body: some View {
@@ -155,7 +159,8 @@ struct VoiceDictationCompactLeading: View {
     /// still use `failureLabelPlacement` so notched Macs keep the title off
     /// the camera.
     private var shouldShowLeadingTitle: Bool {
-        switch controller.phase {
+        guard showsTitle else { return false }
+        return switch controller.phase {
         case .completed: false
         case .failed, .cancelled: failureLabelPlacement == .leading
         case .recording, .transcribing, .cleaning, .idle: true

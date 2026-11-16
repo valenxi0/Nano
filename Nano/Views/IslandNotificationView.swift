@@ -59,6 +59,10 @@ struct IslandNotificationView: View {
                 .opacity(revealed ? 1 : 0)
                 .offset(y: revealed || reduceMotion ? 0 : -6)
                 .animation(notificationRevealAnimation, value: revealed)
+            } else if !ignoresNotch, viewModel.showsMiniIsland, notification.fitsMiniIsland {
+                miniHUD
+                    .opacity(revealed ? 1 : 0)
+                    .animation(notificationRevealAnimation, value: revealed)
             } else {
                 VStack(spacing: 0) {
                     systemHUD.frame(height: notification.showsAirPodsBattery ? 48 : nil)
@@ -152,6 +156,81 @@ struct IslandNotificationView: View {
         .onTapGesture {
             viewModel.handleNotificationTap(notification)
         }
+    }
+
+    // MARK: Mini
+
+    /// Inside a Mini island: the HUD's icon on the left and its level or
+    /// number on the right, beside the notch. A repeated key press updates
+    /// the bar in place, since the card keeps its identity.
+    private var miniHUD: some View {
+        let zone = viewModel.miniSideZoneWidth
+        return HStack(spacing: 0) {
+            miniLeading
+                .frame(width: zone, alignment: .leading)
+            Color.clear
+                .frame(width: viewModel.notchWidth)
+            miniTrailing(zone: zone)
+                .frame(width: zone, alignment: .trailing)
+        }
+        .padding(.horizontal, 9)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            viewModel.handleNotificationTap(notification)
+        }
+    }
+
+    @ViewBuilder
+    private var miniLeading: some View {
+        switch notification.payload {
+        case .level, .timer:
+            Image(systemName: notification.symbol)
+                .font(.system(size: 12, weight: .semibold))
+        case let .battery(snapshot):
+            Image(systemName: snapshot.hudSymbol)
+                .font(.system(size: 13, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(notification.tint)
+        case let .bluetooth(category, _):
+            Image(systemName: category.symbol)
+                .font(.system(size: 12, weight: .semibold))
+        case .system, .agent, .agentSetup, .update, .quillSuggestion:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func miniTrailing(zone: CGFloat) -> some View {
+        switch notification.payload {
+        case let .level(value, muted):
+            ThinMeter(value: muted ? 0 : value, width: max(min(zone - 4, 44), 20))
+        case let .battery(snapshot):
+            Text("\(snapshot.percentage)%")
+                .font(.system(size: 12, weight: .semibold))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .foregroundStyle(notification.tint)
+        case let .bluetooth(_, connected):
+            if connected, let level = lowestAccessoryBattery {
+                Text("\(level)%")
+                    .font(.system(size: 12, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.8))
+            } else {
+                Image(systemName: connected ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(connected ? Color.green : Color.white.opacity(0.5))
+            }
+        case .timer, .system, .agent, .agentSetup, .update, .quillSuggestion:
+            EmptyView()
+        }
+    }
+
+    /// The bud that runs out first, which is the number worth showing.
+    private var lowestAccessoryBattery: Int? {
+        guard let battery = notification.accessoryBattery else { return nil }
+        return [battery.left, battery.right].compactMap { $0 }.min() ?? battery.caseLevel
     }
 
     /// MacBooks have dead pixels in the camera housing. Placement changes the

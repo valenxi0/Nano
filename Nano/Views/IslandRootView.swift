@@ -311,7 +311,8 @@ struct IslandRootView: View {
     private var cornerRadius: CGFloat {
         IslandHitGeometry.cornerRadius(
             expanded: viewModel.phase.showsDashboard,
-            hud: viewModel.phase == .transientHUD || showsOnboardingIsland
+            hud: viewModel.phase == .transientHUD || showsOnboardingIsland,
+            mini: viewModel.showsMiniIsland
         )
     }
 
@@ -326,7 +327,8 @@ struct IslandRootView: View {
     private var notchFlare: CGFloat {
         IslandHitGeometry.notchFlare(
             expanded: viewModel.phase.showsDashboard,
-            hud: viewModel.phase == .transientHUD || showsOnboardingIsland
+            // A HUD inside Mini keeps the closed island's flare.
+            hud: (viewModel.phase == .transientHUD && !viewModel.showsMiniIsland) || showsOnboardingIsland
         )
     }
 
@@ -474,6 +476,14 @@ private struct CompactIslandView: View {
     }
 
     var body: some View {
+        if viewModel.showsMiniIsland {
+            miniBody
+        } else {
+            regularBody
+        }
+    }
+
+    private var regularBody: some View {
         HStack(spacing: 0) {
             HStack(spacing: 8) {
                 leading
@@ -561,6 +571,110 @@ private struct CompactIslandView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Now playing: \(peek.title), \(peek.artist)")
             }
+        }
+    }
+
+    // MARK: Mini
+
+    /// The same states as Regular in the same order, as icons only. Each side
+    /// has a fixed zone beside the notch, so nothing here widens the island.
+    private var miniBody: some View {
+        let zone = viewModel.miniSideZoneWidth
+        return HStack(spacing: 0) {
+            HStack(spacing: 5) { miniLeading }
+                .frame(width: zone, alignment: .leading)
+                .clipped()
+            Color.clear
+                .frame(width: viewModel.notchWidth)
+            HStack(spacing: 5) { miniTrailing }
+                .frame(width: zone, alignment: .trailing)
+                .clipped()
+        }
+        .padding(.horizontal, 9)
+        .foregroundStyle(.white)
+        .animation(musicIsShowing ? nil : .easeOut(duration: 0.6), value: musicIsShowing)
+    }
+
+    @ViewBuilder
+    private var miniLeading: some View {
+        if voiceIsShowing, !voiceSharesWithAgents, !voiceSharesWithMusic {
+            VoiceDictationCompactLeading(controller: voice, showsTitle: false)
+                .transition(.nanoSwap(anchor: .leading, scale: 0.94, reduceMotion: reduceMotion))
+        } else if timer.state != .idle {
+            EmptyView()
+        } else if let activity = compactAgentActivity, activity.totalSessions > 1 {
+            CompactAgentLogoGroup(providers: Array(activity.providers.prefix(2)))
+                .scaleEffect(0.9, anchor: .leading)
+                .transition(.nanoSwap(anchor: .leading, scale: 0.94, reduceMotion: reduceMotion))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(activityAccessibilityLabel(activity))
+        } else if let active = compactSingleAgent {
+            NanoThinkingOrb(scale: .inline, tint: active.id.accentColor)
+                .accessibilityLabel("\(active.id.title), \(activityLabel(active))")
+        } else if musicIsShowing {
+            // Concentric with Mini's 14pt corner less its 4pt inset.
+            NanoArtworkTile(image: media.artwork, size: 22, cornerRadius: 9, symbolSize: 10)
+                .opacity(musicIsPlaying ? 1 : 0.6)
+                .animation(.easeOut(duration: 0.3), value: musicIsPlaying)
+                .id(media.nowPlaying?.trackID)
+                .transition(.nanoSwap(scale: 0.94, reduceMotion: reduceMotion))
+                .accessibilityLabel(media.nowPlaying.map { "Now playing: \($0.title)" } ?? "Music")
+        }
+    }
+
+    @ViewBuilder
+    private var miniTrailing: some View {
+        if voiceSharesWithAgents || voiceSharesWithMusic, voice.phase == .recording {
+            VoiceDictationRecordingBadge(controller: voice)
+                .transition(.nanoSwap(anchor: .trailing, scale: 0.94, reduceMotion: reduceMotion))
+        } else if voiceIsShowing {
+            if voice.phase == .recording {
+                VoiceDictationFlowWaveform(recorder: voice.recorder, width: min(viewModel.miniSideZoneWidth, 40), height: 13)
+                    .transition(.nanoSwap(reduceMotion: reduceMotion))
+            }
+        } else if waitingRequestCount > 0 {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.orange)
+                .transition(.nanoSwap(reduceMotion: reduceMotion))
+                .accessibilityLabel(waitingRequestCount == 1
+                    ? "An agent is waiting for your answer"
+                    : "\(waitingRequestCount) agents are waiting for your answer")
+        } else if timer.state != .idle {
+            Text(timer.formattedRemaining)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.snappy(duration: 0.3), value: timer.formattedRemaining)
+                .accessibilityLabel("\(timer.sessionName.nilIfBlank ?? timer.mode.title), \(timer.formattedRemaining) left")
+        } else if agentsAreShowing, musicIsPlaying {
+            NanoArtworkTile(image: media.artwork, size: 18, cornerRadius: 6, symbolSize: 8)
+                .transition(.nanoSwap(anchor: .trailing, scale: 0.94, reduceMotion: reduceMotion))
+                .accessibilityLabel("Music playing")
+        } else if let activity = compactAgentActivity, activity.totalSessions > 1,
+                  let first = activity.providers.first {
+            Image(systemName: "sparkle")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(first.provider.accentColor)
+                .accessibilityHidden(true)
+        } else if let active = compactSingleAgent {
+            Image(systemName: activitySymbol(active))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(active.id.accentColor)
+                .id(activitySymbol(active))
+                .transition(.nanoSwap(reduceMotion: reduceMotion))
+                .accessibilityHidden(true)
+        } else if musicIsShowing, let track = media.nowPlaying {
+            NanoWave(barWidth: 2, height: 12, color: track.player.accentColor, isActive: track.isPlaying)
+                .transition(.nanoSwap(reduceMotion: reduceMotion))
+        } else if cueCount > 0 || trayCount > 0 {
+            CompactCountsPill(
+                cueCount: cueCount,
+                cueHelp: "\(cueCount) open in \(viewModel.cueStore.title(for: viewModel.cueStore.scope))",
+                trayCount: trayCount
+            )
+            .transition(.nanoSwap(reduceMotion: reduceMotion))
         }
     }
 

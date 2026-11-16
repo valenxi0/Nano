@@ -207,6 +207,7 @@ final class IslandNotificationTests: XCTestCase {
     /// Opt-in: draws the compact island and each card with a MacBook notch
     /// marked in red, so content behind the camera housing is visible on a
     /// Mac that has none. Set TEST_RUNNER_NANO_NOTCH_DIR to an output folder.
+    /// Each state is drawn for both sizes and both shapes.
     @MainActor
     func testRenderNotchStatesWhenRequested() async throws {
         guard let path = ProcessInfo.processInfo.environment["NANO_NOTCH_DIR"] else { return }
@@ -229,12 +230,15 @@ final class IslandNotificationTests: XCTestCase {
                 kind: .changeOfMind, spoken: "actually", written: "", count: 2, lastSeen: Date()
             ))),
         ]
+        let variants = IslandSize.allCases.flatMap { islandSize in IslandPlacement.allCases.map { (islandSize, $0) } }
+        for (islandSize, placement) in variants {
         for (name, notice) in notices {
             let suite = "NanoTests.notch.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suite)!
             defer { defaults.removePersistentDomain(forName: suite) }
             let settings = NanoSettings(defaults: defaults)
-            settings.placement = .attached
+            settings.placement = placement
+            settings.islandGeometry.size = islandSize
             let model = IslandViewModel(settings: settings)
             model.notchWidth = notch.width
             model.notchHeight = notch.height
@@ -263,8 +267,9 @@ final class IslandNotificationTests: XCTestCase {
             let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
             view.cacheDisplay(in: view.bounds, to: bitmap)
             try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
-                .write(to: output.appendingPathComponent("\(name).png"))
+                .write(to: output.appendingPathComponent("\(islandSize.rawValue)-\(placement.rawValue)-\(name).png"))
             model.notificationCenter.dismissAll()
+        }
         }
     }
 

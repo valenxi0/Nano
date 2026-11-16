@@ -336,10 +336,10 @@ final class OnboardingFlow: ObservableObject {
 
     /// Just under the resting island, and under the menu bar.
     private var lowestTop: CGFloat {
-        let gap: CGFloat = settings.placement == .floating ? 8 : 0
+        let gap: CGFloat = settings.placement == .floating ? settings.islandGeometry.floatingTopOffset : 0
         let island = viewModel.phase == .idleCompact
             ? viewModel.preferredSize.height
-            : IslandPhase.idleCompact.preferredSize.height
+            : viewModel.idleIslandSize.height
         return max(menuBarHeight, gap + island) + 12
     }
 

@@ -556,6 +556,15 @@ struct IslandNotification: Identifiable, Equatable, Sendable {
         }
     }
 
+    /// A HUD small enough to play inside a Mini island: an icon and a level
+    /// or a number. Anything with text to read or a choice to make doesn't.
+    var fitsMiniIsland: Bool {
+        switch payload {
+        case .level, .battery, .bluetooth, .timer: true
+        case .system, .agent, .agentSetup, .update, .quillSuggestion: false
+        }
+    }
+
     var showsAirPodsBattery: Bool {
         guard case let .bluetooth(category, connected) = payload, connected,
               BluetoothDevicePresentation.resolve(name: title, category: category) == .airPodsPro

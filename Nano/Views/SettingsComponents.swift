@@ -455,6 +455,10 @@ struct SettingsSearchItem: Identifiable, Hashable {
             .init("Glass intensity", "How strongly the glass blurs what's behind it", .island, anchor: "island.glass"),
             .init("Gradient midpoint", "Where Hybrid's black gives way to glass", .island, anchor: "island.midpoint"),
             .init("Reset appearance", "Back to the default surface", .island, anchor: "island.reset"),
+            .init("Size", "Regular or Mini, which keeps the icons and drops the words", .island, anchor: "island.size"),
+            .init("Width", "How wide the closed island is", .island, anchor: "island.width"),
+            .init("Distance from top", "How far a floating island sits below the top edge", .island, anchor: "island.topOffset"),
+            .init("Reset size and position", "Back to the default width and gap", .island, anchor: "island.resetSize"),
             .init("Dashboard layout", "Drag features into slots, widgets, sizes", .dashboard, anchor: "dashboard.editor"),
             .init("Restore default dashboard", "Put the original layout back", .dashboard),
             .init("Replace the macOS HUD", "Media keys, volume and brightness keys go to Nano", .notifications, anchor: "notif.mediaKeys"),
@@ -492,6 +496,8 @@ struct SettingsSearchItem: Identifiable, Hashable {
                 return settings.appearance == .solidBlack
             case "island.midpoint":
                 return settings.appearance != .hybrid
+            case "island.topOffset":
+                return settings.placement != .floating
             case "notif.mediaKeys":
                 return !mediaKeysShown
             default:
