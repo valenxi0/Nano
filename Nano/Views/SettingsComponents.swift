@@ -442,6 +442,7 @@ struct SettingsSearchItem: Identifiable, Hashable {
         var items: [SettingsSearchItem] = [
             .init("Require a click to open", "Hovering opens the island; a click keeps it open", .general, anchor: "open.click"),
             .init("Follow the active display", "Move the island to the display you're using", .general, anchor: "open.display"),
+            .init("Hide in full screen", "Hide the island while a video or app is full screen", .general, anchor: "open.fullScreen"),
             .init("Open at login", "Start Nano when you log in", .general, anchor: "open.login"),
             .init("Check for updates", "Update checks and the latest version", .privacy, anchor: "updates.check"),
             .init("Report a bug", "Send feedback or request a feature on GitHub", .privacy, anchor: "feedback.bug"),

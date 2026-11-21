@@ -552,6 +552,14 @@ final class IslandPanelController {
     private var fileDragEndScheduled = false
     private var hitTargetUpdateScheduled = false
     private var isShowingContextMenu = false
+    /// True while the island is ordered out because a full-screen window
+    /// covers its display.
+    private var isHiddenForFullScreen = false
+    /// The last answer from the full-screen check. Only a change acts, so
+    /// showing the island from the menu bar inside a full-screen space sticks
+    /// until that space is left.
+    private var lastFullScreenState: Bool?
+    private var fullScreenTimer: Timer?
 
     private let stageSize = IslandStage.size
 
@@ -627,11 +635,13 @@ final class IslandPanelController {
         installHoverTimer()
         installOutsideClickMonitor()
         installQuickCaptureObserver()
+        installFullScreenWatcher()
     }
 
     deinit {
         MainActor.assumeIsolated {
             hoverTimer?.invalidate()
+            fullScreenTimer?.invalidate()
             if let outsideClickMonitor {
                 NSEvent.removeMonitor(outsideClickMonitor)
             }
@@ -641,8 +651,81 @@ final class IslandPanelController {
     }
 
     func show() {
+        isHiddenForFullScreen = false
         reposition()
         panel.orderFrontRegardless()
+    }
+
+    // MARK: Full screen
+
+    /// Space switches and app activations cover entering and leaving full
+    /// screen right away. The timer catches the rest, like a video going full
+    /// screen inside an app that was already frontmost.
+    private func installFullScreenWatcher() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        for name in [
+            NSWorkspace.activeSpaceDidChangeNotification,
+            NSWorkspace.didActivateApplicationNotification,
+        ] {
+            notificationObservers.append(
+                workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    Task { @MainActor in
+                        self?.updateFullScreenVisibility()
+                        // The space animation can still be running on the first check.
+                        try? await Task.sleep(for: .milliseconds(400))
+                        self?.updateFullScreenVisibility()
+                    }
+                }
+            )
+        }
+
+        settings.$hidesInFullScreen
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.lastFullScreenState = nil
+                    self?.updateFullScreenVisibility()
+                }
+            }
+            .store(in: &cancellables)
+
+        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.updateFullScreenVisibility() }
+        }
+        timer.tolerance = 0.3
+        RunLoop.main.add(timer, forMode: .common)
+        fullScreenTimer = timer
+    }
+
+    private func updateFullScreenVisibility() {
+        guard settings.hidesInFullScreen else {
+            lastFullScreenState = nil
+            if isHiddenForFullScreen { show() }
+            return
+        }
+
+        // Hidden, it may come back on another display; shown, it is where the
+        // panel sits.
+        let screen = isHiddenForFullScreen ? targetScreen() : (panelScreen ?? targetScreen())
+        let covered = NanoFullScreenDetector.isCovered(screen)
+        guard covered != lastFullScreenState else { return }
+        lastFullScreenState = covered
+
+        if covered {
+            guard !isHiddenForFullScreen, panel.isVisible else { return }
+            NanoDiag.log("full screen: hiding island")
+            isHiddenForFullScreen = true
+            setPointerInside(false)
+            panel.orderOut(nil)
+        } else if isHiddenForFullScreen {
+            NanoDiag.log("full screen: showing island")
+            show()
+        }
+    }
+
+    private var panelScreen: NSScreen? {
+        let anchor = NSPoint(x: panel.frame.midX, y: panel.frame.maxY - 1)
+        return NSScreen.screens.first { NSMouseInRect(anchor, $0.frame, false) }
     }
 
     private func observeChanges() {
@@ -1238,6 +1321,53 @@ final class IslandPanelController {
             pinnedScreenID = target.displayID
         }
         return target
+    }
+}
+
+/// Whether a full-screen window covers a display. A native full-screen
+/// window (a YouTube video in Safari or Chrome, a movie player, any app in its
+/// own space) sits at the normal window layer and fills the whole display,
+/// menu bar area included, which an ordinary or zoomed window never does.
+/// Window bounds and layers need no Screen Recording permission.
+enum NanoFullScreenDetector {
+    static func isCovered(_ screen: NSScreen) -> Bool {
+        guard let primary = NSScreen.screens.first,
+              let windows = CGWindowListCopyWindowInfo(
+                [.optionOnScreenOnly, .excludeDesktopElements],
+                kCGNullWindowID
+              ) as? [[String: Any]]
+        else { return false }
+        return isCovered(
+            screenFrame: screen.frame,
+            primaryScreenFrame: primary.frame,
+            windows: windows,
+            ownPID: ProcessInfo.processInfo.processIdentifier
+        )
+    }
+
+    /// `windows` is a `CGWindowListCopyWindowInfo` result; frames are AppKit's.
+    static func isCovered(
+        screenFrame frame: CGRect,
+        primaryScreenFrame primary: CGRect,
+        windows: [[String: Any]],
+        ownPID: pid_t
+    ) -> Bool {
+        // Window bounds are top-left based on the primary display.
+        let target = CGRect(
+            x: frame.minX,
+            y: primary.maxY - frame.maxY,
+            width: frame.width,
+            height: frame.height
+        )
+        return windows.contains { info in
+            guard (info[kCGWindowLayer as String] as? Int) == 0,
+                  (info[kCGWindowOwnerPID as String] as? pid_t) != ownPID,
+                  (info[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                  let boundsInfo = info[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: boundsInfo)
+            else { return false }
+            return bounds.insetBy(dx: -1, dy: -1).contains(target)
+        }
     }
 }
 
