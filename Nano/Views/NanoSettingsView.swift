@@ -757,6 +757,12 @@ private struct GeneralSettingsPane: View {
                     isOn: $settings.followActiveDisplay
                 )
                 .settingsAnchor("open.display")
+                SettingsToggleRow(
+                    "Hide in full screen",
+                    subtitle: "Nano steps aside while a video or app is full screen, and comes back when it leaves.",
+                    isOn: $settings.hidesInFullScreen
+                )
+                .settingsAnchor("open.fullScreen")
             }
 
             SettingsSection(
