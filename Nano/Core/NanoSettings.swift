@@ -324,6 +324,7 @@ final class NanoSettings: ObservableObject {
         static let clickToOpen = "island.clickToOpen"
         static let appearance = "island.appearance"
         static let followActiveDisplay = "display.followActive"
+        static let hidesInFullScreen = "display.hidesInFullScreen"
         static let pinnedScreenID = "island.pinnedScreenID"
         static let islandSize = "island.size"
         static let regularSideZone = "island.regularSideZone"
@@ -432,6 +433,13 @@ final class NanoSettings: ObservableObject {
 
     @Published var followActiveDisplay: Bool {
         didSet { defaults.set(followActiveDisplay, forKey: Key.followActiveDisplay) }
+    }
+
+    /// When true, the island steps aside while a full-screen window (a video,
+    /// a full-screen app) covers its display, and comes back when it leaves.
+    /// On by default.
+    @Published var hidesInFullScreen: Bool {
+        didSet { defaults.set(hidesInFullScreen, forKey: Key.hidesInFullScreen) }
     }
 
     /// The display the island stays on while "Follow the active display" is
@@ -985,6 +993,9 @@ final class NanoSettings: ObservableObject {
         followActiveDisplay = defaults.object(forKey: Key.followActiveDisplay) == nil
             ? true
             : defaults.bool(forKey: Key.followActiveDisplay)
+        hidesInFullScreen = defaults.object(forKey: Key.hidesInFullScreen) == nil
+            ? true
+            : defaults.bool(forKey: Key.hidesInFullScreen)
         let standardGeometry = IslandGeometry.standard
         // A local copy, so the closure doesn't capture `self` mid-initialization.
         let store = defaults
