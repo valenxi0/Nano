@@ -69,7 +69,7 @@ enum SettingsDestination: String, CaseIterable, Identifiable {
     var keywords: [String] {
         switch self {
         case .general:
-            ["click to open", "hover", "display", "monitor", "features", "music", "calendar", "weather", "timer", "camera", "tray", "add-ons", "setup"]
+            ["click to open", "auto-hide", "full screen", "hover", "display", "monitor", "features", "music", "calendar", "weather", "timer", "camera", "tray", "add-ons", "setup"]
         case .island:
             ["appearance", "surface", "solid black", "liquid glass", "hybrid", "color", "opacity", "shape", "notch", "floating", "gradient", "tint"]
         case .dashboard:
@@ -763,6 +763,12 @@ private struct GeneralSettingsPane: View {
                     isOn: $settings.hidesInFullScreen
                 )
                 .settingsAnchor("open.fullScreen")
+                SettingsToggleRow(
+                    "Automatically hide the island",
+                    subtitle: "It hides while nothing is happening. Point at its spot to bring it back.",
+                    isOn: $settings.autoHide
+                )
+                .settingsAnchor("open.autoHide")
             }
 
             SettingsSection(

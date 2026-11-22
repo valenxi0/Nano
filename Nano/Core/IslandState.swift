@@ -654,6 +654,27 @@ final class IslandViewModel: ObservableObject {
         )
     }
 
+    /// Whether the closed island shows something live: a dictation, a timer,
+    /// working agents, an agent waiting for an answer, or music. Auto-hide
+    /// keeps the island up while this is true. Mirrors `CompactIslandView`.
+    var compactShowsActivity: Bool {
+        if settings.isEnabled(.voiceDictation), voiceDictation.phase != .idle { return true }
+        if timerStore.state != .idle { return true }
+        if settings.isEnabled(.agents), !hookBridge.pending.isEmpty { return true }
+        if CompactAgentActivitySummary.singleActiveSnapshot(
+            snapshots: agentService.snapshots,
+            sessions: sessionStore.sessions,
+            enabledProviders: settings.enabledAgentProviders
+        ) != nil { return true }
+        if let activity = CompactAgentActivitySummary.make(
+            snapshots: agentService.snapshots,
+            sessions: sessionStore.sessions,
+            enabledProviders: settings.enabledAgentProviders
+        ), activity.totalSessions > 1 { return true }
+        guard settings.isEnabled(.music), let track = mediaController.nowPlaying else { return false }
+        return track.isPlaying || holdsPausedMusic || mediaPeek != nil
+    }
+
     /// Mini applies to the closed island and to the small HUDs (volume,
     /// brightness, battery, Bluetooth, timer). Cards with something to read
     /// or answer still open at full size.

@@ -552,14 +552,14 @@ final class IslandPanelController {
     private var fileDragEndScheduled = false
     private var hitTargetUpdateScheduled = false
     private var isShowingContextMenu = false
-    /// True while the island is ordered out because a full-screen window
-    /// covers its display.
-    private var isHiddenForFullScreen = false
-    /// The last answer from the full-screen check. Only a change acts, so
-    /// showing the island from the menu bar inside a full-screen space sticks
-    /// until that space is left.
-    private var lastFullScreenState: Bool?
+    /// A full-screen window covers the island's display. Only tracked while
+    /// "Hide in full screen" is on.
+    private var isCoveredByFullScreen = false
     private var fullScreenTimer: Timer?
+    private var workspaceObservers: [NSObjectProtocol] = []
+    /// The island stays up until then after it last had a reason to show, so a
+    /// collapse finishes its spring and a pointer passing by doesn't flicker it.
+    private var hideNotBefore = Date.distantPast
 
     private let stageSize = IslandStage.size
 
@@ -647,33 +647,69 @@ final class IslandPanelController {
             }
             pointerMonitors.forEach { NSEvent.removeMonitor($0) }
             notificationObservers.forEach(NotificationCenter.default.removeObserver)
+            workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
         }
     }
 
     func show() {
-        isHiddenForFullScreen = false
         reposition()
-        panel.orderFrontRegardless()
+        if !shouldHide {
+            panel.orderFrontRegardless()
+        }
+    }
+
+    // MARK: Visibility
+
+    /// Anything the user is looking at or waiting on shows the island: an open
+    /// dashboard, a HUD or notification, setup, a dictation. Otherwise a
+    /// full-screen window hides it, and auto-hide hides it while the closed
+    /// island has nothing live and the pointer isn't on it.
+    private var shouldHide: Bool {
+        IslandVisibility.shouldHide(
+            phase: viewModel.phase,
+            inSetup: viewModel.onboardingIsland != nil,
+            dictating: showsVoiceChrome,
+            coveredByFullScreen: isCoveredByFullScreen,
+            autoHide: settings.autoHide,
+            pointerInside: isPointerInside,
+            showsActivity: { self.viewModel.compactShowsActivity }
+        )
+    }
+
+    private func syncPanelVisibility() {
+        if !shouldHide {
+            hideNotBefore = Date().addingTimeInterval(0.6)
+            if !panel.isVisible {
+                NanoDiag.log("visibility: showing island")
+                reposition()
+                panel.orderFrontRegardless()
+            }
+        } else if panel.isVisible, Date() >= hideNotBefore {
+            NanoDiag.log("visibility: hiding island fullScreen=\(isCoveredByFullScreen)")
+            setPointerInside(false)
+            panel.orderOut(nil)
+        }
     }
 
     // MARK: Full screen
 
     /// Space switches and app activations cover entering and leaving full
     /// screen right away. The timer catches the rest, like a video going full
-    /// screen inside an app that was already frontmost.
+    /// screen inside an app that was already frontmost. It runs only while the
+    /// setting is on.
     private func installFullScreenWatcher() {
         let workspace = NSWorkspace.shared.notificationCenter
         for name in [
             NSWorkspace.activeSpaceDidChangeNotification,
             NSWorkspace.didActivateApplicationNotification,
         ] {
-            notificationObservers.append(
+            workspaceObservers.append(
                 workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                     Task { @MainActor in
-                        self?.updateFullScreenVisibility()
+                        self?.refreshFullScreen()
                         // The space animation can still be running on the first check.
                         try? await Task.sleep(for: .milliseconds(400))
-                        self?.updateFullScreenVisibility()
+                        self?.refreshFullScreen()
                     }
                 }
             )
@@ -681,46 +717,38 @@ final class IslandPanelController {
 
         settings.$hidesInFullScreen
             .removeDuplicates()
-            .sink { [weak self] _ in
+            .sink { [weak self] enabled in
                 DispatchQueue.main.async {
-                    self?.lastFullScreenState = nil
-                    self?.updateFullScreenVisibility()
+                    guard let self else { return }
+                    self.fullScreenTimer?.invalidate()
+                    self.fullScreenTimer = nil
+                    if enabled {
+                        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+                            MainActor.assumeIsolated { self?.refreshFullScreen() }
+                        }
+                        timer.tolerance = 0.3
+                        RunLoop.main.add(timer, forMode: .common)
+                        self.fullScreenTimer = timer
+                    }
+                    self.refreshFullScreen()
                 }
             }
             .store(in: &cancellables)
-
-        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.updateFullScreenVisibility() }
-        }
-        timer.tolerance = 0.3
-        RunLoop.main.add(timer, forMode: .common)
-        fullScreenTimer = timer
     }
 
-    private func updateFullScreenVisibility() {
-        guard settings.hidesInFullScreen else {
-            lastFullScreenState = nil
-            if isHiddenForFullScreen { show() }
-            return
+    private func refreshFullScreen() {
+        var covered = false
+        if settings.hidesInFullScreen {
+            // Hidden, it may come back on another display; shown, it is where
+            // the panel sits.
+            let screen = panel.isVisible ? (panelScreen ?? targetScreen()) : targetScreen()
+            covered = NanoFullScreenDetector.isCovered(screen)
         }
-
-        // Hidden, it may come back on another display; shown, it is where the
-        // panel sits.
-        let screen = isHiddenForFullScreen ? targetScreen() : (panelScreen ?? targetScreen())
-        let covered = NanoFullScreenDetector.isCovered(screen)
-        guard covered != lastFullScreenState else { return }
-        lastFullScreenState = covered
-
-        if covered {
-            guard !isHiddenForFullScreen, panel.isVisible else { return }
-            NanoDiag.log("full screen: hiding island")
-            isHiddenForFullScreen = true
-            setPointerInside(false)
-            panel.orderOut(nil)
-        } else if isHiddenForFullScreen {
-            NanoDiag.log("full screen: showing island")
-            show()
+        if covered != isCoveredByFullScreen {
+            isCoveredByFullScreen = covered
+            NanoDiag.log("full screen: covered=\(covered)")
         }
+        syncPanelVisibility()
     }
 
     private var panelScreen: NSScreen? {
@@ -739,6 +767,7 @@ final class IslandPanelController {
                 scheduleHoverPoll(after: phase == .idleCompact
                     ? NanoHoverCadence.active
                     : NanoHoverCadence.idle)
+                DispatchQueue.main.async { self.syncPanelVisibility() }
                 if phase == .hoverDashboard {
                     DispatchQueue.main.async {
                         self.isPointerInside = self.pointerIsOverIsland()
@@ -784,6 +813,15 @@ final class IslandPanelController {
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
                     self?.reposition()
+                }
+            }
+            .store(in: &cancellables)
+
+        settings.$autoHide
+            .dropFirst()
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.syncPanelVisibility()
                 }
             }
             .store(in: &cancellables)
@@ -1133,7 +1171,8 @@ final class IslandPanelController {
 
     @discardableResult
     private func pollHover() -> TimeInterval {
-        guard panel.isVisible else { return NanoHoverCadence.hidden }
+        syncPanelVisibility()
+        guard panel.isVisible else { return pollHiddenIsland() }
         let mouse = NSEvent.mouseLocation
         let screen = panel.screen ?? targetScreen()
         let nearTop = mouse.y >= screen.frame.maxY - 96
@@ -1158,6 +1197,24 @@ final class IslandPanelController {
         )
     }
 
+    /// Auto-hidden, the island comes back when the pointer reaches the spot it
+    /// sits in, or when a file is dragged there.
+    private func pollHiddenIsland() -> TimeInterval {
+        guard settings.autoHide, !isCoveredByFullScreen else { return NanoHoverCadence.hidden }
+        let mouse = NSEvent.mouseLocation
+        let screen = targetScreen()
+        let nearTop = mouse.y >= screen.frame.maxY - 96
+        guard nearTop else { return NanoHoverCadence.idle }
+        if panelScreen?.displayID != screen.displayID { reposition() }
+        noteButtonUp()
+        if pointerIsOverIsland() {
+            if isDraggingHoldable() { viewModel.beginFileDrag() }
+            setPointerInside(true)
+            syncPanelVisibility()
+        }
+        return NanoHoverCadence.active
+    }
+
     private func installQuickCaptureObserver() {
         for name in [Notification.Name.nanoIslandWantsKeyboard] {
             let observer = NotificationCenter.default.addObserver(
@@ -1170,6 +1227,8 @@ final class IslandPanelController {
                     // Keystrokes must land in the island, not the app that had focus.
                     NSApp.activate(ignoringOtherApps: true)
                     self.outsideClickGraceUntil = Date().addingTimeInterval(0.75)
+                    self.hideNotBefore = Date().addingTimeInterval(0.6)
+                    self.reposition()
                     self.panel.makeKeyAndOrderFront(nil)
                 }
             }
@@ -1321,6 +1380,25 @@ final class IslandPanelController {
             pinnedScreenID = target.displayID
         }
         return target
+    }
+}
+
+enum IslandVisibility {
+    /// `showsActivity` is a closure so the agent and media state behind it is
+    /// read only when auto-hide needs it.
+    static func shouldHide(
+        phase: IslandPhase,
+        inSetup: Bool,
+        dictating: Bool,
+        coveredByFullScreen: Bool,
+        autoHide: Bool,
+        pointerInside: Bool,
+        showsActivity: () -> Bool
+    ) -> Bool {
+        guard phase == .idleCompact, !inSetup, !dictating else { return false }
+        if coveredByFullScreen { return true }
+        guard autoHide else { return false }
+        return !pointerInside && !showsActivity()
     }
 }
 

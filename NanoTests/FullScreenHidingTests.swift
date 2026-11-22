@@ -64,4 +64,59 @@ final class FullScreenHidingTests: XCTestCase {
         settings.hidesInFullScreen = false
         XCTAssertFalse(NanoSettings(defaults: UserDefaults(suiteName: suite)!).hidesInFullScreen)
     }
+
+    // MARK: Visibility rules
+
+    private func hides(
+        _ phase: IslandPhase = .idleCompact,
+        inSetup: Bool = false,
+        dictating: Bool = false,
+        fullScreen: Bool = false,
+        autoHide: Bool = false,
+        pointerInside: Bool = false,
+        activity: Bool = false
+    ) -> Bool {
+        IslandVisibility.shouldHide(
+            phase: phase,
+            inSetup: inSetup,
+            dictating: dictating,
+            coveredByFullScreen: fullScreen,
+            autoHide: autoHide,
+            pointerInside: pointerInside,
+            showsActivity: { activity }
+        )
+    }
+
+    func testTheIslandStaysByDefault() {
+        XCTAssertFalse(hides())
+    }
+
+    func testFullScreenHidesTheClosedIslandEvenWithActivity() {
+        XCTAssertTrue(hides(fullScreen: true))
+        XCTAssertTrue(hides(fullScreen: true, pointerInside: true, activity: true))
+    }
+
+    func testHUDsDashboardsSetupAndDictationShowThroughFullScreenAndAutoHide() {
+        for phase in [IslandPhase.transientHUD, .hoverDashboard, .pinnedDashboard, .dragTarget] {
+            XCTAssertFalse(hides(phase, fullScreen: true, autoHide: true), "\(phase)")
+        }
+        XCTAssertFalse(hides(inSetup: true, fullScreen: true, autoHide: true))
+        XCTAssertFalse(hides(dictating: true, fullScreen: true, autoHide: true))
+    }
+
+    func testAutoHideHidesOnlyAQuietIslandThePointerIsNotOn() {
+        XCTAssertTrue(hides(autoHide: true))
+        XCTAssertFalse(hides(autoHide: true, pointerInside: true))
+        XCTAssertFalse(hides(autoHide: true, activity: true))
+    }
+
+    func testAutoHideIsOffByDefaultAndRemembered() {
+        let suite = "nano-autohide-\(UUID().uuidString)"
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let settings = NanoSettings(defaults: UserDefaults(suiteName: suite)!)
+        XCTAssertFalse(settings.autoHide)
+
+        settings.autoHide = true
+        XCTAssertTrue(NanoSettings(defaults: UserDefaults(suiteName: suite)!).autoHide)
+    }
 }
