@@ -334,7 +334,12 @@ enum AgentSessionJump {
     }
 
     static func canJump(_ session: AgentSession, runtime: Runtime = .current) -> Bool {
-        if session.cmuxLocation != nil, CmuxSessionJump.isEnabled, CmuxSessionJump.isInstalled {
+        // A session found on disk carries no reported tab, yet cmux's own
+        // record may still hold it. cmux is not one of `terminalBundleIDs`,
+        // so without this the open action stays hidden and that record is
+        // never asked.
+        if CmuxSessionJump.shouldTry(session),
+           session.cmuxLocation != nil || CmuxSessionJump.isRunning {
             return true
         }
         let destination = host(for: session, runtime: runtime)
@@ -556,7 +561,7 @@ enum AgentSessionJump {
         _ session: AgentSession,
         completion reportResult: @escaping @MainActor (OpenResult) -> Void = { _ in }
     ) {
-        guard CmuxSessionJump.isEnabled, CmuxSessionJump.isInstalled else {
+        guard CmuxSessionJump.shouldTry(session) else {
             openInHost(session, completion: reportResult)
             return
         }

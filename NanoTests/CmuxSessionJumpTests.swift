@@ -124,6 +124,42 @@ final class CmuxSessionJumpTests: XCTestCase {
         XCTAssertNil(bridge.sessionStates["plain-session"]?.cmuxLocation)
     }
 
+    @MainActor
+    func testResumingOutsideCmuxForgetsTheOldTab() async throws {
+        let bridge = AgentHookBridge()
+        func send(host: String, workspace: String, surface: String) async throws {
+            let payload: [String: Any] = [
+                "source": "claude",
+                "host_bundle_id": host,
+                "cmux_workspace_id": workspace,
+                "cmux_surface_id": surface,
+                "event": [
+                    "hook_event_name": "UserPromptSubmit",
+                    "session_id": "resumed",
+                    "cwd": "/tmp",
+                    "prompt": "hello",
+                ],
+            ]
+            _ = await bridge.handle(try JSONSerialization.data(withJSONObject: payload))
+        }
+        try await send(host: CmuxSessionJump.bundleID, workspace: workspace, surface: surface)
+        XCTAssertNotNil(bridge.sessionStates["resumed"]?.cmuxLocation)
+
+        try await send(host: "com.apple.Terminal", workspace: "", surface: "")
+        XCTAssertNil(bridge.sessionStates["resumed"]?.cmuxLocation)
+        XCTAssertEqual(bridge.sessionStates["resumed"]?.hostBundleID, "com.apple.terminal")
+    }
+
+    func testOnlySessionsCmuxCanHoldAreSentThere() {
+        let location = CmuxSessionJump.Location(workspaceID: workspace, surfaceID: surface)
+        XCTAssertTrue(CmuxSessionJump.mayHold(cmuxLocation: location, hostBundleID: nil))
+        XCTAssertTrue(CmuxSessionJump.mayHold(cmuxLocation: nil, hostBundleID: nil),
+                      "a disk-discovered session can still be in cmux's own record")
+        XCTAssertTrue(CmuxSessionJump.mayHold(cmuxLocation: nil, hostBundleID: "com.cmuxterm.app"))
+        XCTAssertFalse(CmuxSessionJump.mayHold(cmuxLocation: nil, hostBundleID: "com.apple.terminal"),
+                       "resumed in another app: the old cmux tab is not where it lives")
+    }
+
     func testBridgeScriptForwardsCmuxIDs() {
         let script = AgentHookBridge.bridgeScript
         XCTAssertTrue(script.contains("CMUX_WORKSPACE_ID"))

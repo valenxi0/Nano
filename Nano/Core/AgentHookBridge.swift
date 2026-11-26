@@ -770,12 +770,13 @@ final class AgentHookBridge: ObservableObject {
         if let bundleID = event["host_bundle_id"] as? String, !bundleID.isEmpty {
             state.hostBundleID = bundleID.lowercased()
         }
-        if let location = CmuxSessionJump.location(
+        // Every bridge hook reports the pair, empty outside cmux. A session
+        // resumed somewhere else loses its old tab here instead of jumping
+        // back to it.
+        state.cmuxLocation = CmuxSessionJump.location(
             workspaceID: event["cmux_workspace_id"] as? String,
             surfaceID: event["cmux_surface_id"] as? String
-        ) {
-            state.cmuxLocation = location
-        }
+        )
         if let cwd = (event["cwd"] as? String) ?? (event["workspaceRoot"] as? String),
            !cwd.isEmpty {
             state.workingDirectory = cwd

@@ -28,6 +28,25 @@ enum CmuxSessionJump {
         cliURL() != nil
     }
 
+    static var isRunning: Bool {
+        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == bundleID }
+    }
+
+    /// Whether cmux can be holding this session. A tab its hooks reported
+    /// says yes. A hook from another app says no: the session was resumed
+    /// there, and the old cmux tab, if it is still open, is not where it
+    /// lives now. With neither, only cmux's own record can tell.
+    static func mayHold(cmuxLocation: Location?, hostBundleID: String?) -> Bool {
+        if cmuxLocation != nil { return true }
+        guard let hostBundleID else { return true }
+        return hostBundleID.lowercased() == bundleID
+    }
+
+    static func shouldTry(_ session: AgentSession) -> Bool {
+        isEnabled && isInstalled
+            && mayHold(cmuxLocation: session.cmuxLocation, hostBundleID: session.hostBundleID)
+    }
+
     /// The CLI that ships inside the app, so a missing `cmux` on PATH (Nano is
     /// launched by launchd, not a shell) does not matter.
     static func cliURL(appURL: URL? = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)) -> URL? {

@@ -2103,8 +2103,10 @@ final class AgentSessionStore: ObservableObject {
             session.hostBundleID = bundleID
             changed = true
         }
-        if let location = state.cmuxLocation, session.cmuxLocation != location {
-            session.cmuxLocation = location
+        // Hooks are the only source of a cmux tab, so their answer, including
+        // "none", replaces the old one.
+        if session.cmuxLocation != state.cmuxLocation {
+            session.cmuxLocation = state.cmuxLocation
             changed = true
         }
         if let detail = state.lastToolInputDescription, session.currentActivity != detail {
