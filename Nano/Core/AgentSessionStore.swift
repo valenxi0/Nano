@@ -652,6 +652,8 @@ struct AgentSession: Identifiable, Equatable, Sendable {
     /// The launching app's bundle ID when hooks reported one. Names the app
     /// for `.app` hosts, which have no dedicated jump route.
     var hostBundleID: String? = nil
+    /// The cmux workspace and tab running this session, from its hooks.
+    var cmuxLocation: CmuxSessionJump.Location? = nil
 
     /// What to call this session on screen.
     ///
@@ -2101,6 +2103,10 @@ final class AgentSessionStore: ObservableObject {
             session.hostBundleID = bundleID
             changed = true
         }
+        if let location = state.cmuxLocation, session.cmuxLocation != location {
+            session.cmuxLocation = location
+            changed = true
+        }
         if let detail = state.lastToolInputDescription, session.currentActivity != detail {
             session.currentActivity = detail
             changed = true
@@ -2161,6 +2167,7 @@ final class AgentSessionStore: ObservableObject {
         built.workingDirectory = state.workingDirectory
         built.host = state.host
         built.hostBundleID = state.hostBundleID
+        built.cmuxLocation = state.cmuxLocation
         built.startedAt = state.firstSeen
         // The same silence rule as `merge`. A disk scan rebuilds the list
         // without hook-only sessions, and this path puts them back, so
@@ -4376,6 +4383,7 @@ enum AgentSessionParsers {
         // Neither should erase what the other established.
         if winner.host == nil { winner.host = other.host }
         if winner.hostBundleID == nil { winner.hostBundleID = other.hostBundleID }
+        if winner.cmuxLocation == nil { winner.cmuxLocation = other.cmuxLocation }
         if winner.gitBranch == nil { winner.gitBranch = other.gitBranch }
         if winner.startedAt == nil { winner.startedAt = other.startedAt }
         if winner.contextWindow == nil { winner.contextWindow = other.contextWindow }

@@ -355,6 +355,7 @@ final class NanoSettings: ObservableObject {
         static let usageProviders = "agents.usageProviders"
         static let usageDisplayMode = "agents.usageDisplayMode"
         static let claudeConfigDirectory = "agents.claudeConfigDirectory"
+        static let opensSessionsInCmux = CmuxSessionJump.settingKey
         static let claudeLocalUsageMigration = "agents.claudeLocalUsageMigration"
         static let trackAllSupportedMigration = "agents.trackAllSupported"
         static let trackGrokMigration = "agents.trackGrok"
@@ -630,6 +631,12 @@ final class NanoSettings: ObservableObject {
     /// The compact island shows how many files the tray holds.
     @Published var trayShowsCompactCount: Bool {
         didSet { defaults.set(trayShowsCompactCount, forKey: Key.trayShowsCompactCount) }
+    }
+
+    /// Opening a session focuses the exact cmux tab that runs it. Off by
+    /// default; only useful to people who run their agents in cmux.
+    @Published var opensSessionsInCmux: Bool {
+        didSet { defaults.set(opensSessionsInCmux, forKey: Key.opensSessionsInCmux) }
     }
 
     @Published var checksForUpdates: Bool {
@@ -1126,6 +1133,7 @@ final class NanoSettings: ObservableObject {
         trayRemovesAfterDragOut = defaults.object(forKey: Key.trayRemovesAfterDragOut) as? Bool ?? false
         trayShowsCompactCount = defaults.object(forKey: Key.trayShowsCompactCount) as? Bool ?? true
         checksForUpdates = defaults.object(forKey: Key.checksForUpdates) as? Bool ?? true
+        opensSessionsInCmux = defaults.bool(forKey: Key.opensSessionsInCmux)
         preferredMediaPlayer = defaults.string(forKey: Key.preferredMediaPlayer)
             .flatMap(MediaPlayerKind.init(rawValue:))
 

@@ -334,6 +334,9 @@ enum AgentSessionJump {
     }
 
     static func canJump(_ session: AgentSession, runtime: Runtime = .current) -> Bool {
+        if session.cmuxLocation != nil, CmuxSessionJump.isEnabled, CmuxSessionJump.isInstalled {
+            return true
+        }
         let destination = host(for: session, runtime: runtime)
         if destination == .terminal { return runtime.terminalRunning }
         if destination == .app {
@@ -552,6 +555,26 @@ enum AgentSessionJump {
     static func open(
         _ session: AgentSession,
         completion reportResult: @escaping @MainActor (OpenResult) -> Void = { _ in }
+    ) {
+        guard CmuxSessionJump.isEnabled, CmuxSessionJump.isInstalled else {
+            openInHost(session, completion: reportResult)
+            return
+        }
+        // cmux knows the exact tab. When it does not hold this session, or
+        // its socket refuses Nano, the usual host routing still applies.
+        Task { @MainActor in
+            if await CmuxSessionJump.focus(sessionID: session.id, reported: session.cmuxLocation) {
+                reportResult(.opened)
+            } else {
+                openInHost(session, completion: reportResult)
+            }
+        }
+    }
+
+    @MainActor
+    private static func openInHost(
+        _ session: AgentSession,
+        completion reportResult: @escaping @MainActor (OpenResult) -> Void
     ) {
         let source = origin(for: session)
         let runtime = Runtime.current

@@ -1899,6 +1899,15 @@ private struct AgentSettingsPane: View {
                         .controlSize(.small)
                 }
                 .settingsAnchor("agents.hooks")
+                SettingsToggleRow(
+                    "Open sessions in cmux",
+                    subtitle: CmuxSessionJump.isInstalled
+                        ? "Jumps to the exact cmux tab running the session. Needs live hooks for agents cmux doesn't track itself."
+                        : "cmux isn't installed.",
+                    isOn: $settings.opensSessionsInCmux
+                )
+                .disabled(!CmuxSessionJump.isInstalled && !settings.opensSessionsInCmux)
+                .settingsAnchor("agents.cmux")
             }
 
             SettingsCard {
