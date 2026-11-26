@@ -338,6 +338,7 @@ final class NanoSettings: ObservableObject {
         static let glassTintColor = "appearance.glassTintColor"
         static let enabledModules = "modules.enabled"
         static let enabledAgentProviders = "agents.enabledProviders"
+        static let answersCodexApprovals = "agents.answersCodexApprovals"
         static let weatherLocationName = "weather.locationName"
         static let weatherLatitude = "weather.latitude"
         static let weatherLongitude = "weather.longitude"
@@ -614,6 +615,12 @@ final class NanoSettings: ObservableObject {
 
     @Published var preferredMediaPlayer: MediaPlayerKind? {
         didSet { defaults.set(preferredMediaPlayer?.rawValue, forKey: Key.preferredMediaPlayer) }
+    }
+
+    /// Codex approvals get Allow and Deny on the island. Off, Codex asks in
+    /// its own window and the island only shows that it is waiting.
+    @Published var answersCodexApprovals: Bool {
+        didSet { defaults.set(answersCodexApprovals, forKey: Key.answersCodexApprovals) }
     }
 
     /// The compact island briefly widens to name a new song.
@@ -1123,6 +1130,7 @@ final class NanoSettings: ObservableObject {
         calendarShowsAllDay = defaults.object(forKey: Key.calendarShowsAllDay) as? Bool ?? true
         calendarLayout = defaults.string(forKey: Key.calendarLayout).flatMap(CalendarLayout.init(rawValue:)) ?? .month
         musicAnnouncesTrackChanges = defaults.object(forKey: Key.musicAnnouncesTrackChanges) as? Bool ?? true
+        answersCodexApprovals = defaults.object(forKey: Key.answersCodexApprovals) as? Bool ?? true
         trayRemovesAfterDragOut = defaults.object(forKey: Key.trayRemovesAfterDragOut) as? Bool ?? false
         trayShowsCompactCount = defaults.object(forKey: Key.trayShowsCompactCount) as? Bool ?? true
         checksForUpdates = defaults.object(forKey: Key.checksForUpdates) as? Bool ?? true

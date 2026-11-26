@@ -72,15 +72,18 @@ struct AgentModuleView: View {
         // An answer from the island changes a row before any hook event does.
         .onChange(of: hooks.pending) { _, _ in applyLiveSignals() }
         .onChange(of: hooks.recentDecisions) { _, _ in applyLiveSignals() }
+        .onChange(of: hooks.sessionsWaitingOnHost) { _, _ in applyLiveSignals() }
     }
 
     private func applyLiveSignals() {
         sessions.applyLiveSignals(hooks.liveSessions, waiting: waitingSessionIDs, decisions: hooks.recentDecisions)
     }
 
-    /// An answered card is no longer anyone waiting.
+    /// An answered card is no longer anyone waiting. A prompt only the
+    /// agent's window can answer is, even after its card leaves the island.
     private var waitingSessionIDs: Set<String> {
         Set(hooks.pending.filter { !$0.isResolved }.compactMap(\.sessionID))
+            .union(hooks.sessionsWaitingOnHost.keys)
     }
 
     // MARK: - Session detail

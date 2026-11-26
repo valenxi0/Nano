@@ -422,6 +422,187 @@ final class AgentInteractionParityTests: XCTestCase {
         XCTAssertFalse(waiting.respondsThroughBridge)
     }
 
+    // MARK: - Cards only the agent's window can answer
+
+    /// An MCP form answered in Claude: the tool finishing retracts the card,
+    /// which used to wait for the next prompt.
+    func testHostQuestionLeavesWhenItsToolFinishes() async throws {
+        let bridge = AgentHookBridge()
+        var resumed: [String] = []
+        bridge.didResumeSession = { resumed.append($0) }
+
+        _ = await bridge.handle(try payload(source: "claude", [
+            "hook_event_name": "Notification", "session_id": "claude-q",
+            "notification_type": "elicitation_dialog", "message": "Linear needs a team",
+        ]))
+        XCTAssertEqual(bridge.sessionsWaitingOnHost["claude-q"], .question)
+
+        _ = await bridge.handle(try payload(source: "claude", [
+            "hook_event_name": "PostToolUse", "session_id": "claude-q", "tool_name": "mcp__linear__create_issue",
+        ]))
+        XCTAssertEqual(resumed, ["claude-q"])
+        XCTAssertNil(bridge.sessionsWaitingOnHost["claude-q"])
+    }
+
+    /// The live repro: the turn ended and the question card stayed on top
+    /// of the finished card.
+    func testHostQuestionLeavesWhenTheTurnEnds() async throws {
+        let bridge = AgentHookBridge()
+        var resumed: [String] = []
+        var finished: [String?] = []
+        bridge.didResumeSession = { resumed.append($0) }
+        bridge.didFinishTurn = { finished.append($0) }
+
+        _ = await bridge.handle(try payload(source: "claude", [
+            "hook_event_name": "UserPromptSubmit", "session_id": "claude-s", "prompt": "file it",
+        ]))
+        resumed.removeAll()
+        _ = await bridge.handle(try payload(source: "claude", [
+            "hook_event_name": "Notification", "session_id": "claude-s",
+            "notification_type": "elicitation_dialog", "message": "Linear needs a team",
+        ]))
+        _ = await bridge.handle(try payload(source: "claude", [
+            "hook_event_name": "Stop", "session_id": "claude-s",
+        ]))
+        XCTAssertEqual(resumed, ["claude-s"])
+        XCTAssertEqual(finished, ["claude-s"], "the finished card still comes")
+        XCTAssertTrue(bridge.sessionsWaitingOnHost.isEmpty)
+    }
+
+    /// An idle prompt waits for the next prompt; nothing else retracts it.
+    func testIdlePromptIsNotAWaitTheAgentMovesPast() async throws {
+        let bridge = AgentHookBridge()
+        _ = await bridge.handle(try payload(source: "claude", [
+            "hook_event_name": "Notification", "session_id": "claude-i",
+            "notification_type": "idle_prompt", "message": "Claude is waiting for your input",
+        ]))
+        XCTAssertTrue(bridge.sessionsWaitingOnHost.isEmpty)
+    }
+
+    /// Approved in the agent's window, then a long command: nothing arrives
+    /// until it ends. The card leaves the island; the row keeps waiting.
+    func testQuietHostCardLeavesTheIslandButTheRowStillWaits() async throws {
+        let bridge = AgentHookBridge()
+        bridge.hostCardLifetime = .milliseconds(50)
+        var resumed: [String] = []
+        bridge.didResumeSession = { resumed.append($0) }
+
+        _ = await bridge.handle(try payload(source: "claude", [
+            "hook_event_name": "Notification", "session_id": "claude-l",
+            "notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash",
+        ]))
+        for _ in 0..<100 where resumed.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(resumed, ["claude-l"])
+        XCTAssertEqual(bridge.sessionsWaitingOnHost["claude-l"], .permission)
+
+        _ = await bridge.handle(try payload(source: "claude", [
+            "hook_event_name": "PostToolUse", "session_id": "claude-l", "tool_name": "Bash",
+        ]))
+        XCTAssertNil(bridge.sessionsWaitingOnHost["claude-l"])
+    }
+
+    /// Two hook processes race: the notification can land before the
+    /// answerable request. The answerable card replaces the passive one.
+    func testAnswerableRequestReplacesAHostApprovalCard() async throws {
+        let bridge = AgentHookBridge()
+        var resumed: [String] = []
+        bridge.didResumeSession = { resumed.append($0) }
+
+        _ = await bridge.handle(try payload(source: "claude", [
+            "hook_event_name": "Notification", "session_id": "claude-r",
+            "notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash",
+        ]))
+        let data = try payload(source: "claude", [
+            "hook_event_name": "PermissionRequest", "session_id": "claude-r",
+            "tool_name": "Bash", "tool_input": ["command": "npm test"],
+        ])
+        let reply = Task { await bridge.handle(data) }
+        let request = try await waitForPending(bridge)
+        XCTAssertEqual(resumed, ["claude-r"])
+        XCTAssertNil(bridge.sessionsWaitingOnHost["claude-r"])
+        bridge.respond(to: request.id, choice: 1)
+        _ = await reply.value
+    }
+
+    // MARK: - Codex approvals (issue #10)
+
+    private func codexRollout(reviewer: String, turnID: String, padding: Int = 0) throws -> URL {
+        let url = root.appendingPathComponent("rollout-\(UUID().uuidString).jsonl")
+        var lines = [
+            #"{"timestamp":"t","type":"turn_context","payload":{"turn_id":"old","approvals_reviewer":"user"}}"#,
+            #"{"timestamp":"t","type":"turn_context","payload":{"turn_id":"\#(turnID)","approval_policy":"on-request","approvals_reviewer":"\#(reviewer)"}}"#,
+        ]
+        let filler = #"{"timestamp":"t","type":"response_item","payload":{"type":"message","text":"\#(String(repeating: "x", count: 1000))"}}"#
+        lines += Array(repeating: filler, count: padding)
+        try (lines.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    func testCodexReviewerIsReadFromTheTurnsContext() throws {
+        let rollout = try codexRollout(reviewer: "auto_review", turnID: "t1", padding: 600)
+        XCTAssertEqual(AgentHookBridge.codexApprovalsReviewer(rolloutPath: rollout.path, turnID: "t1"), "auto_review")
+        XCTAssertEqual(AgentHookBridge.codexApprovalsReviewer(rolloutPath: rollout.path, turnID: "old"), "user")
+        XCTAssertEqual(AgentHookBridge.codexApprovalsReviewer(rolloutPath: rollout.path, turnID: nil), "auto_review")
+        XCTAssertNil(AgentHookBridge.codexApprovalsReviewer(rolloutPath: rollout.path, turnID: "missing"))
+        XCTAssertNil(AgentHookBridge.codexApprovalsReviewer(rolloutPath: "/nonexistent/rollout.jsonl", turnID: "t1"))
+    }
+
+    /// Codex runs the hook before its auto-review. A card would take the
+    /// decision from it, so the hook answers nothing at once.
+    func testCodexAutoReviewTurnGetsNoCard() async throws {
+        let rollout = try codexRollout(reviewer: "auto_review", turnID: "t1")
+        let bridge = AgentHookBridge()
+        var cards: [AgentHookBridge.PendingRequest] = []
+        bridge.didRequestAttention = { cards.append($0) }
+
+        let reply = await bridge.handle(try payload(source: "codex", [
+            "hook_event_name": "PermissionRequest", "session_id": "codex-a", "turn_id": "t1",
+            "transcript_path": rollout.path, "tool_name": "mcp__aside__repl", "tool_input": ["code": "a.href"],
+        ]))
+        XCTAssertNil(reply)
+        XCTAssertTrue(bridge.pending.isEmpty)
+        XCTAssertTrue(cards.isEmpty)
+        XCTAssertTrue(bridge.sessionsWaitingOnHost.isEmpty)
+    }
+
+    /// The setting off: Codex asks in its own window, the island says so.
+    func testCodexApprovalsLeftToCodexShowAWaitingCard() async throws {
+        let rollout = try codexRollout(reviewer: "user", turnID: "t1")
+        let bridge = AgentHookBridge()
+        bridge.answersCodexApprovals = false
+        var cards: [AgentHookBridge.PendingRequest] = []
+        bridge.didRequestAttention = { cards.append($0) }
+
+        let reply = await bridge.handle(try payload(source: "codex", [
+            "hook_event_name": "PermissionRequest", "session_id": "codex-u", "turn_id": "t1",
+            "transcript_path": rollout.path, "tool_name": "Bash", "tool_input": ["command": "npm test"],
+        ]))
+        XCTAssertNil(reply)
+        XCTAssertTrue(bridge.pending.isEmpty)
+        let card = try XCTUnwrap(cards.first)
+        XCTAssertFalse(card.respondsThroughBridge)
+        XCTAssertEqual(card.title, "Codex needs approval for Bash")
+        XCTAssertEqual(bridge.sessionsWaitingOnHost["codex-u"], .permission)
+    }
+
+    /// A user-reviewed turn with the setting on keeps today's card.
+    func testCodexUserReviewedTurnIsStillAnsweredInNano() async throws {
+        let rollout = try codexRollout(reviewer: "user", turnID: "t1")
+        let bridge = AgentHookBridge()
+        let data = try payload(source: "codex", [
+            "hook_event_name": "PermissionRequest", "session_id": "codex-n", "turn_id": "t1",
+            "transcript_path": rollout.path, "tool_name": "Bash", "tool_input": ["command": "npm test"],
+        ])
+        let reply = Task { await bridge.handle(data) }
+        let request = try await waitForPending(bridge)
+        XCTAssertTrue(request.respondsThroughBridge)
+        bridge.respond(to: request.id, choice: 1)
+        let decision = try object(await reply.value)["hookSpecificOutput"] as? [String: Any]
+        XCTAssertEqual((decision?["decision"] as? [String: Any])?["behavior"] as? String, "allow")
+    }
+
     // MARK: - Bridge script
 
     /// The script is written from a Swift literal, where one lost backslash
@@ -640,7 +821,8 @@ final class AgentApprovalSnapshots: XCTestCase {
         send("s1", "Bash", ["command": "cd ~/Coding/atlas && rm -rf node_modules/.cache dist && pnpm install --frozen-lockfile && pnpm -r build && pnpm test --filter @atlas/core -- --runInBand"], cwd: "/Users/me/atlas")
         send("s2", "Edit", ["file_path": file.path, "old_string": "let delay = 1.2", "new_string": "let written = try installer.install()\nstate = written ? .connected : .failed"], cwd: "/Users/me/North-Star")
         send("s3", "mcp__slackbot__post_message", ["channel": "general", "text": "Deploy finished"], cwd: "/Users/me/atlas")
-        for _ in 0..<200 where bridge.pending.count < 3 { try await Task.sleep(for: .milliseconds(10)) }
+        send("s4", "mcp__aside__repl", ["code": "document.querySelector('a').href"], cwd: "/Users/me/atlas")
+        for _ in 0..<200 where bridge.pending.count < 4 { try await Task.sleep(for: .milliseconds(10)) }
 
         let now = Date()
         func state(_ id: String, prompt: String, working: Bool, finished: Date? = nil, ago: TimeInterval) -> AgentHookBridge.LiveSessionState {
@@ -697,6 +879,14 @@ final class AgentApprovalSnapshots: XCTestCase {
             try shot(IslandNotificationView(notification: .agent(attention), settings: settings, viewModel: viewModel, ignoresNotch: true, revealsImmediately: true)
                 .frame(height: attention.cardHeight), width: IslandAgentAttention.cardWidth, name: "island-card-\(index)", wait: 3)
         }
+        // A card only the agent's window can answer.
+        let waiting = IslandAgentAttention(AgentHookBridge.notificationRequest(
+            event: ["notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash",
+                    "cwd": "/Users/me/atlas"],
+            source: "claude", sessionID: "w2"
+        ))
+        try shot(IslandNotificationView(notification: .agent(waiting), settings: settings, viewModel: viewModel, ignoresNotch: true, revealsImmediately: true)
+            .frame(height: waiting.cardHeight), width: IslandAgentAttention.cardWidth, name: "island-card-waiting", wait: 3)
         bridge.pending.forEach { bridge.respond(to: $0.id, choice: 0) }
     }
 }

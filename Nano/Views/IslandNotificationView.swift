@@ -903,7 +903,10 @@ private struct AgentNotificationCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 6)
+        // Room between the session header and the headline. Matches the 24
+        // that `measuredCardHeight` counts for these insets.
+        .padding(.top, 18)
+        .padding(.bottom, 6)
         .frame(maxHeight: .infinity, alignment: .bottom)
     }
 

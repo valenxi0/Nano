@@ -261,9 +261,18 @@ final class AgentHookBridge: ObservableObject {
     private var retractedByAgent: Set<String> = []
     private var lingerTasks: [String: Task<Void, Never>] = [:]
     private var enabledProviders = Set(AgentProviderID.supported)
-    /// Sessions showing a permission card that only the agent's own prompt
-    /// can answer. The next event that proves the agent moved on retracts it.
-    private var sessionsAwaitingHostApproval: Set<String> = []
+    /// Sessions showing a card that only the agent's own window can answer
+    /// (a permission or a question), and which kind. The next event that
+    /// proves the agent moved on retracts the card; the row says "Needs you"
+    /// until then.
+    @Published private(set) var sessionsWaitingOnHost: [String: RequestKind] = [:]
+    private var hostCardExpiryTasks: [String: Task<Void, Never>] = [:]
+    /// How long such a card stays on the island when its session goes quiet.
+    /// An approval given in the agent's window sends nothing until the tool
+    /// finishes, so a long command would otherwise keep it up throughout.
+    var hostCardLifetime: Duration = .seconds(120)
+    /// Off: Codex asks in its own window and Nano only shows that it waits.
+    var answersCodexApprovals = true
 
     /// Codex re-locks hooks whose position in `hooks.json` moved. Re-approving
     /// Nano's own entries is safe to do silently; the fingerprint below keeps
@@ -313,6 +322,9 @@ final class AgentHookBridge: ObservableObject {
         waiters.removeAll()
         waiterExpiryTasks.values.forEach { $0.cancel() }
         waiterExpiryTasks.removeAll()
+        hostCardExpiryTasks.values.forEach { $0.cancel() }
+        hostCardExpiryTasks.removeAll()
+        sessionsWaitingOnHost.removeAll()
         pending.removeAll()
         activeWaiters.forEach { $0.resume(returning: nil) }
         server.stop()
@@ -462,6 +474,7 @@ final class AgentHookBridge: ObservableObject {
             return nil
         }
         if name == "UserPromptSubmit", let sessionID {
+            endHostWait(sessionID)
             didResumeSession?(sessionID)
         }
         if name == "PreToolUse" || name == "PostToolUse", let sessionID {
@@ -514,12 +527,15 @@ final class AgentHookBridge: ObservableObject {
         }
         // Ahead of the finished-turn card, so a turn that ends on a refused
         // permission still gets to announce itself.
+        // A new approval request replaces a host-only approval card; a
+        // question card waits for the question tool to finish.
         let movedOn: Set<String> = [
             "PostToolUse", "PostToolUseFailure", "PermissionDenied",
             "Stop", "StopFailure", "StopCancelled", "SessionEnd",
         ]
-        if let sessionID, movedOn.contains(name),
-           sessionsAwaitingHostApproval.remove(sessionID) != nil {
+        if let sessionID, let waiting = sessionsWaitingOnHost[sessionID],
+           movedOn.contains(name) || (name == "PermissionRequest" && waiting == .permission) {
+            endHostWait(sessionID)
             didResumeSession?(sessionID)
         }
         if finishedTurn {
@@ -534,7 +550,19 @@ final class AgentHookBridge: ObservableObject {
                 ?? (input["path"] as? String)
                 ?? (input["command"] as? String)
                 ?? (input["url"] as? String)
-            let answerable = adapter?.controls.contains(.approvePermission) == true
+            var answerable = adapter?.controls.contains(.approvePermission) == true
+            if adapter?.provider == .codex {
+                // The hook runs before Codex's own reviewer. A card here would
+                // take the decision from Codex's auto-review, so answer
+                // nothing and let Codex continue its own approval flow.
+                let path = event["transcript_path"] as? String
+                let turnID = event["turn_id"] as? String
+                let reviewer = await Task.detached {
+                    path.flatMap { Self.codexApprovalsReviewer(rolloutPath: $0, turnID: turnID) }
+                }.value
+                if let reviewer, reviewer != "user" { return nil }
+                answerable = answerable && answersCodexApprovals
+            }
 
             let request = PendingRequest(
                 id: answerable ? UUID().uuidString : "permission:\(sessionID ?? "unknown")",
@@ -559,9 +587,10 @@ final class AgentHookBridge: ObservableObject {
 
             guard answerable else {
                 // Kimi reports this just before it waits for approval and
-                // takes no answer from the hook. Say what it is waiting for
-                // and let the agent's own prompt decide.
-                if let sessionID { sessionsAwaitingHostApproval.insert(sessionID) }
+                // takes no answer from the hook, and Codex can be left to
+                // ask in its own window. Say what it is waiting for and let
+                // the agent's own prompt decide.
+                if let sessionID { beginHostWait(sessionID, kind: .permission) }
                 didRequestAttention?(request)
                 return nil
             }
@@ -587,6 +616,7 @@ final class AgentHookBridge: ObservableObject {
                 // takes no answer. The agent is still blocked on the user, so
                 // say so rather than showing nothing; the answer happens in
                 // the host.
+                if let sessionID { beginHostWait(sessionID, kind: .question) }
                 didRequestAttention?(Self.unanswerableQuestionRequest(
                     input: input,
                     event: event,
@@ -627,8 +657,11 @@ final class AgentHookBridge: ObservableObject {
                pending.contains(where: { $0.sessionID == sessionID && $0.kind == .permission }) {
                 return nil
             }
-            if request.kind == .permission, let sessionID {
-                sessionsAwaitingHostApproval.insert(sessionID)
+            // An idle prompt or a quota notice waits for the next prompt, not
+            // for an answer, so it is not a wait the agent can move past.
+            let type = (event["notification_type"] as? String) ?? (event["notificationType"] as? String)
+            if let sessionID, request.kind == .permission || Self.blockingNotificationTypes.contains(type ?? "") {
+                beginHostWait(sessionID, kind: request.kind)
             }
             didRequestAttention?(request)
             return nil
@@ -1284,6 +1317,65 @@ final class AgentHookBridge: ObservableObject {
 
     func dismiss(_ id: String) {
         respond(to: id, choice: nil)
+    }
+
+    // MARK: - Waits only the agent's window can answer
+
+    /// Notification types that block the agent until the user answers in its
+    /// own window. `idle_prompt` and the quota notices wait for a new prompt.
+    nonisolated static let blockingNotificationTypes: Set<String> = [
+        "elicitation_dialog", "elicitation_url_dialog", "agent_needs_input",
+    ]
+
+    private func beginHostWait(_ sessionID: String, kind: RequestKind) {
+        sessionsWaitingOnHost[sessionID] = kind
+        hostCardExpiryTasks[sessionID]?.cancel()
+        let lifetime = hostCardLifetime
+        hostCardExpiryTasks[sessionID] = Task { [weak self] in
+            try? await Task.sleep(for: lifetime)
+            guard !Task.isCancelled, let self else { return }
+            // The card leaves the island; the row keeps saying "Needs you"
+            // until the session moves on.
+            self.hostCardExpiryTasks[sessionID] = nil
+            self.didResumeSession?(sessionID)
+        }
+    }
+
+    private func endHostWait(_ sessionID: String) {
+        hostCardExpiryTasks.removeValue(forKey: sessionID)?.cancel()
+        sessionsWaitingOnHost[sessionID] = nil
+    }
+
+    /// Who decides approvals in this Codex turn: `user`, or Codex's own
+    /// reviewer (`auto_review`, `guardian_subagent`). Codex writes it into
+    /// each turn's `turn_context` line of the rollout; hook payloads do not
+    /// carry it. The line is near the end, so the file is read backwards.
+    nonisolated static func codexApprovalsReviewer(rolloutPath: String, turnID: String?) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: rolloutPath) else { return nil }
+        defer { try? handle.close() }
+        guard var end = try? handle.seekToEnd() else { return nil }
+        let chunk: UInt64 = 256 * 1024
+        let limit: UInt64 = 16 * 1024 * 1024
+        var tail = Data()
+        while end > 0, tail.count < limit {
+            let start = end > chunk ? end - chunk : 0
+            try? handle.seek(toOffset: start)
+            guard let data = try? handle.read(upToCount: Int(end - start)) else { return nil }
+            tail = data + tail
+            end = start
+            // Every complete line after the first newline; the first may be cut.
+            let lines = tail.split(separator: UInt8(ascii: "\n"))
+            for line in lines.dropFirst(end > 0 ? 1 : 0).reversed()
+            where line.range(of: Data("\"turn_context\"".utf8)) != nil {
+                guard let object = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
+                      object["type"] as? String == "turn_context",
+                      let payload = object["payload"] as? [String: Any]
+                else { continue }
+                if let turnID, let lineTurn = payload["turn_id"] as? String, lineTurn != turnID { continue }
+                return payload["approvals_reviewer"] as? String
+            }
+        }
+        return nil
     }
 
     private func append(_ request: PendingRequest) {

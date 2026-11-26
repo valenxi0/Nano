@@ -466,6 +466,7 @@ struct SettingsSearchItem: Identifiable, Hashable {
             .init("Replace the macOS HUD", "Media keys, volume and brightness keys go to Nano", .notifications, anchor: "notif.mediaKeys"),
             .init("Show quota as", "Used or remaining", .agents, anchor: "agents.quota"),
             .init("Live hooks", "Connect agents for approvals and questions", .agents, anchor: "agents.hooks"),
+            .init("Codex approvals", "Answer them in Nano or leave them to Codex", .agents, anchor: "agents.codexApprovals"),
             .init("Claude usage", "Local status data for the 5h and 7d windows", .agents, anchor: "agents.claudeUsage"),
             .init("Sessions and usage", "Which agents Nano tracks", .agents, anchor: "agents.providers"),
             .init("Quill insights", "Speed, time saved, words, streak", .voiceDictation),

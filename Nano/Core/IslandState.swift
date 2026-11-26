@@ -287,6 +287,9 @@ final class IslandViewModel: ObservableObject {
     private var sleepObservers: [NSObjectProtocol] = []
     lazy var hookBridge: AgentHookBridge = {
         let bridge = AgentHookBridge()
+        settings.$answersCodexApprovals
+            .sink { [weak bridge] in bridge?.answersCodexApprovals = $0 }
+            .store(in: &cancellables)
         bridge.didSignalActivity = { [weak self] signal in
             guard let self else { return }
             agentService.noteHookActivity(signal)
