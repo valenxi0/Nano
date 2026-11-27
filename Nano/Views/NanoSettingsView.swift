@@ -1899,6 +1899,15 @@ private struct AgentSettingsPane: View {
                         .controlSize(.small)
                 }
                 .settingsAnchor("agents.hooks")
+                SettingsRow(
+                    "Answer Codex approvals in Nano",
+                    subtitle: "Off: Codex asks in its own window and Nano shows that it's waiting. Codex's auto-review always decides on its own."
+                ) {
+                    Toggle("Answer Codex approvals in Nano", isOn: $settings.answersCodexApprovals)
+                        .labelsHidden()
+                        .toggleStyle(HeroSwitchToggleStyle(showsLabel: false))
+                }
+                .settingsAnchor("agents.codexApprovals")
                 SettingsToggleRow(
                     "Open sessions in cmux",
                     subtitle: CmuxSessionJump.isInstalled
@@ -1906,7 +1915,7 @@ private struct AgentSettingsPane: View {
                         : "cmux isn't installed.",
                     isOn: $settings.opensSessionsInCmux
                 )
-                .disabled(!CmuxSessionJump.isInstalled && !settings.opensSessionsInCmux)
+                .disabled(!CmuxSessionJump.isInstalled)
                 .settingsAnchor("agents.cmux")
             }
 

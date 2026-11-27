@@ -392,7 +392,9 @@ final class IslandNotificationTests: XCTestCase {
         }
         for provider in [AgentProviderID.grok, .pi, .opencode, .kimi, .claude, .codex] {
             let notice = IslandNotification.agentPreview(provider: provider, kind: .permission)
-            XCTAssertEqual(notice.contentSize.height, 196)
+            guard case let .agent(attention) = notice.payload else { return XCTFail("not an agent card") }
+            // As tall as its content, so no gap opens under the header.
+            XCTAssertEqual(notice.contentSize.height, attention.measuredCardHeight)
         }
     }
 
@@ -498,7 +500,7 @@ final class IslandNotificationTests: XCTestCase {
         XCTAssertFalse(request.respondsThroughBridge)
         XCTAssertTrue(notification.isSticky)
         XCTAssertNil(notification.duration)
-        XCTAssertEqual(notification.contentSize.height, 150)
+        XCTAssertEqual(notification.contentSize.height, IslandAgentAttention(request).measuredCardHeight)
     }
 
     func testDelayedPermissionNotificationDoesNotClaimItCanAnswerTheProvider() {

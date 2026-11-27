@@ -344,10 +344,10 @@ struct IslandAgentAttention: Equatable, Sendable {
         return switch kind {
         case .question where respondsThroughBridge && !options.isEmpty:
             max(126 + CGFloat(options.count) * 40, measuredCardHeight)
-        case .permission:
-            max(196, measuredCardHeight)
-        case .question:
-            max(150, measuredCardHeight)
+        // Measured, not floored: content sits at the bottom of the card, so
+        // any extra height opened a gap under the header.
+        case .permission, .question:
+            measuredCardHeight
         case .completion:
             isFailure ? 154 : 86
         case .notification:
@@ -361,7 +361,7 @@ struct IslandAgentAttention: Equatable, Sendable {
     /// and the island grows with them instead of cutting off the buttons.
     var measuredCardHeight: CGFloat {
         let textWidth = Self.cardWidth - 40
-        var content = 12 + Self.textHeight(displayHeadline, size: 16, weight: .semibold, width: textWidth, maxLines: 2)
+        var content = 24 + Self.textHeight(displayHeadline, size: 16, weight: .semibold, width: textWidth, maxLines: 2)
         if let commandPreview {
             content += 4 + Self.commandBoxHeight(commandPreview)
         } else if let detail = displayDetail, !detail.isEmpty {
