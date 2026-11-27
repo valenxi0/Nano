@@ -10,7 +10,7 @@ import Foundation
 /// selects the workspace and focuses the surface over cmux's socket instead of
 /// guessing a window by its title.
 ///
-/// Off by default: the user turns it on under Settings → Agents.
+/// On by default; Settings → Agents can turn it off.
 enum CmuxSessionJump {
     static let bundleID = "com.cmuxterm.app"
     static let settingKey = "agents.opensSessionsInCmux"
@@ -21,7 +21,7 @@ enum CmuxSessionJump {
     }
 
     static var isEnabled: Bool {
-        UserDefaults.standard.bool(forKey: settingKey)
+        UserDefaults.standard.object(forKey: settingKey) as? Bool ?? true
     }
 
     static var isInstalled: Bool {
@@ -43,8 +43,9 @@ enum CmuxSessionJump {
     }
 
     static func shouldTry(_ session: AgentSession) -> Bool {
-        isEnabled && isInstalled
-            && mayHold(cmuxLocation: session.cmuxLocation, hostBundleID: session.hostBundleID)
+        // Cheapest first: most sessions come from another app and stop here.
+        mayHold(cmuxLocation: session.cmuxLocation, hostBundleID: session.hostBundleID)
+            && isEnabled && isInstalled
     }
 
     /// The CLI that ships inside the app, so a missing `cmux` on PATH (Nano is
@@ -98,7 +99,8 @@ enum CmuxSessionJump {
             // another tab. The pair the hook reported covers agents cmux does
             // not hook itself, and a stale one simply fails to focus.
             var candidates: [Location] = []
-            if let output = run(cli, ["sessions", "--session", sessionID, "--json"]),
+            if let sessionID = safeSessionID(sessionID),
+               let output = run(cli, ["sessions", "--session", sessionID, "--json"]),
                let recorded = location(fromSessionsJSON: output, sessionID: sessionID) {
                 candidates.append(recorded)
             }
@@ -116,18 +118,45 @@ enum CmuxSessionJump {
         return true
     }
 
-    /// Runs the CLI and returns stdout when it exits cleanly.
-    private static func run(_ cli: URL, _ arguments: [String]) -> Data? {
+    /// Runs the CLI and returns stdout when it exits cleanly. A cmux that
+    /// doesn't answer within `timeout` is stopped, so a stuck socket falls
+    /// back to the usual jump instead of leaving the click hanging.
+    static func run(_ cli: URL, _ arguments: [String], timeout: TimeInterval = 2) -> Data? {
         let process = Process()
         process.executableURL = cli
         process.arguments = arguments
         let output = Pipe()
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
+        let collected = OutputBuffer()
+        output.fileHandleForReading.readabilityHandler = { collected.append($0.availableData) }
+        defer { output.fileHandleForReading.readabilityHandler = nil }
         do { try process.run() } catch { return nil }
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return process.terminationStatus == 0 ? data : nil
+        guard exited.wait(timeout: .now() + timeout) == .success else {
+            process.terminate()
+            return nil
+        }
+        output.fileHandleForReading.readabilityHandler = nil
+        collected.append(output.fileHandleForReading.readDataToEndOfFile())
+        return process.terminationStatus == 0 ? collected.data : nil
+    }
+
+    private final class OutputBuffer: @unchecked Sendable {
+        private let lock = NSLock()
+        private var storage = Data()
+        func append(_ chunk: Data) { lock.withLock { storage.append(chunk) } }
+        var data: Data { lock.withLock { storage } }
+    }
+
+    /// Agent session IDs are UUIDs or simple tokens (`ses_…`). One that could
+    /// read as a flag, or holds anything else, is not passed to cmux.
+    static func safeSessionID(_ value: String) -> String? {
+        guard let first = value.first, first != "-",
+              value.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-_.".contains($0)) })
+        else { return nil }
+        return value
     }
 
     /// cmux IDs are UUIDs; anything else is dropped before it reaches argv.

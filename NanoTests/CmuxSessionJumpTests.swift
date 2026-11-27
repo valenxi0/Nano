@@ -160,6 +160,40 @@ final class CmuxSessionJumpTests: XCTestCase {
                        "resumed in another app: the old cmux tab is not where it lives")
     }
 
+    func testSessionIDsThatCouldReadAsFlagsAreNotPassedToCmux() {
+        XCTAssertEqual(CmuxSessionJump.safeSessionID("0f8e9c1a-2b3c-4d5e-8f90-123456789abc"), "0f8e9c1a-2b3c-4d5e-8f90-123456789abc")
+        XCTAssertEqual(CmuxSessionJump.safeSessionID("ses_3aZ9.k"), "ses_3aZ9.k")
+        XCTAssertNil(CmuxSessionJump.safeSessionID("--json"))
+        XCTAssertNil(CmuxSessionJump.safeSessionID("abc def"))
+        XCTAssertNil(CmuxSessionJump.safeSessionID(""))
+    }
+
+    func testAStuckCmuxIsStoppedInsteadOfHangingTheJump() throws {
+        let cli = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("cmux-stuck-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: cli) }
+        try Data("#!/bin/sh\nsleep 30\n".utf8).write(to: cli)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: cli.path)
+        let started = Date()
+        XCTAssertNil(CmuxSessionJump.run(cli, ["sessions"], timeout: 0.5))
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+    }
+
+    func testCmuxAnswerIsReadBack() throws {
+        let cli = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("cmux-ok-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: cli) }
+        try Data("#!/bin/sh\necho \"$1\"\n".utf8).write(to: cli)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: cli.path)
+        XCTAssertEqual(CmuxSessionJump.run(cli, ["hello"]).flatMap { String(data: $0, encoding: .utf8) }, "hello\n")
+    }
+
+    @MainActor
+    func testOpeningInCmuxIsOnByDefault() throws {
+        let suite = "NanoTests.cmuxDefault.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        XCTAssertTrue(NanoSettings(defaults: defaults).opensSessionsInCmux)
+    }
+
     func testBridgeScriptForwardsCmuxIDs() {
         let script = AgentHookBridge.bridgeScript
         XCTAssertTrue(script.contains("CMUX_WORKSPACE_ID"))

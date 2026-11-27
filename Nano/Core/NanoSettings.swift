@@ -640,8 +640,8 @@ final class NanoSettings: ObservableObject {
         didSet { defaults.set(trayShowsCompactCount, forKey: Key.trayShowsCompactCount) }
     }
 
-    /// Opening a session focuses the exact cmux tab that runs it. Off by
-    /// default; only useful to people who run their agents in cmux.
+    /// Opening a session focuses the exact cmux tab that runs it. On by
+    /// default; it does nothing for sessions that don't run in cmux.
     @Published var opensSessionsInCmux: Bool {
         didSet { defaults.set(opensSessionsInCmux, forKey: Key.opensSessionsInCmux) }
     }
@@ -1141,7 +1141,7 @@ final class NanoSettings: ObservableObject {
         trayRemovesAfterDragOut = defaults.object(forKey: Key.trayRemovesAfterDragOut) as? Bool ?? false
         trayShowsCompactCount = defaults.object(forKey: Key.trayShowsCompactCount) as? Bool ?? true
         checksForUpdates = defaults.object(forKey: Key.checksForUpdates) as? Bool ?? true
-        opensSessionsInCmux = defaults.bool(forKey: Key.opensSessionsInCmux)
+        opensSessionsInCmux = defaults.object(forKey: Key.opensSessionsInCmux) as? Bool ?? true
         preferredMediaPlayer = defaults.string(forKey: Key.preferredMediaPlayer)
             .flatMap(MediaPlayerKind.init(rawValue:))
 

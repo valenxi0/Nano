@@ -1911,7 +1911,7 @@ private struct AgentSettingsPane: View {
                 SettingsToggleRow(
                     "Open sessions in cmux",
                     subtitle: CmuxSessionJump.isInstalled
-                        ? "Jumps to the exact cmux tab running the session. Needs live hooks for agents cmux doesn't track itself."
+                        ? "Jumps to the exact cmux tab running the session. In cmux, set Settings › Automation › Socket Control to Automation so Nano can reach it."
                         : "cmux isn't installed.",
                     isOn: $settings.opensSessionsInCmux
                 )
