@@ -235,6 +235,7 @@ enum AgentSessionJump {
         "com.googlecode.iterm2",
         "com.mitchellh.ghostty",
         "dev.warp.Warp-Stable",
+        "dev.warp.Warp-Preview",
         "net.kovidgoyal.kitty",
     ]
 
@@ -561,14 +562,19 @@ enum AgentSessionJump {
         _ session: AgentSession,
         completion reportResult: @escaping @MainActor (OpenResult) -> Void = { _ in }
     ) {
-        guard CmuxSessionJump.shouldTry(session) else {
+        let triesCmux = CmuxSessionJump.shouldTry(session)
+        let triesWarp = WarpSessionJump.shouldTry(session)
+        guard triesCmux || triesWarp else {
             openInHost(session, completion: reportResult)
             return
         }
-        // cmux knows the exact tab. When it does not hold this session, or
-        // its socket refuses Nano, the usual host routing still applies.
+        // cmux and Warp know the exact tab. When neither holds this session,
+        // or it refuses Nano, the usual host routing still applies.
         Task { @MainActor in
-            if await CmuxSessionJump.focus(sessionID: session.id, reported: session.cmuxLocation) {
+            if triesCmux,
+               await CmuxSessionJump.focus(sessionID: session.id, reported: session.cmuxLocation) {
+                reportResult(.opened)
+            } else if triesWarp, await WarpSessionJump.focus(session) {
                 reportResult(.opened)
             } else {
                 openInHost(session, completion: reportResult)
