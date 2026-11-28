@@ -2025,3 +2025,46 @@ final class IslandNotificationRoutingTests: XCTestCase {
     }
 
 }
+
+/// A question card shows the whole question: up to six lines grow the card,
+/// longer ones scroll inside it. Approval headlines keep two lines.
+final class AgentQuestionHeadlineTests: XCTestCase {
+    private func question(_ text: String, kind: AgentHookBridge.RequestKind = .question) -> IslandAgentAttention {
+        IslandAgentAttention(AgentHookBridge.PendingRequest(
+            id: UUID().uuidString,
+            source: "claude",
+            kind: kind,
+            title: text,
+            detail: nil,
+            options: [.init(id: 0, label: "Yes"), .init(id: 1, label: "No")],
+            sessionID: "s",
+            receivedAt: Date(),
+            projectName: "p"
+        ))
+    }
+
+    private let sentence = "Prod sunucusunda ve GitHub'da şunlar yapılacak: runner kullanıcısı, servis kurulumu ve token kaydı. "
+
+    func testAQuestionOfFourLinesIsShownWholeAndGrowsTheCard() {
+        let short = question("Continue?")
+        let long = question(String(repeating: sentence, count: 3))
+        XCTAssertFalse(long.headlineOverflows)
+        XCTAssertGreaterThan(long.measuredCardHeight, short.measuredCardHeight + IslandAgentAttention.headlineLineHeight * 2,
+                            "lines past the old two-line cap are counted")
+    }
+
+    func testAVeryLongQuestionScrollsAtSixLines() {
+        let huge = question(String(repeating: sentence, count: 20))
+        XCTAssertTrue(huge.headlineOverflows)
+        XCTAssertLessThanOrEqual(
+            huge.measuredCardHeight - question("x").measuredCardHeight,
+            IslandAgentAttention.headlineLineHeight * CGFloat(IslandAgentAttention.questionHeadlineVisibleLines - 1) + 1,
+            "the card stops growing at six lines"
+        )
+    }
+
+    func testApprovalHeadlinesKeepTwoLines() {
+        XCTAssertEqual(question("x", kind: .permission).headlineMaxLines, 2)
+        XCTAssertEqual(question("x").headlineMaxLines, IslandAgentAttention.questionHeadlineVisibleLines)
+    }
+}

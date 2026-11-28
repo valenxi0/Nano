@@ -860,10 +860,7 @@ private struct AgentNotificationCard: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(attention.displayHeadline)
-                .font(.system(size: 16, weight: .semibold))
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+            headline
             if let command = attention.commandPreview {
                 ScrollView(.vertical) {
                     Text(Self.highlightedCommand(command)).font(.system(size: 11, design: .monospaced))
@@ -908,6 +905,36 @@ private struct AgentNotificationCard: View {
         .padding(.top, 18)
         .padding(.bottom, 6)
         .frame(maxHeight: .infinity, alignment: .bottom)
+    }
+
+    /// Questions show up to six lines; a longer one scrolls in place so the
+    /// card never cuts it off or grows past the screen.
+    @ViewBuilder
+    private var headline: some View {
+        let text = Text(attention.displayHeadline)
+            .font(.system(size: 16, weight: .semibold))
+        if attention.headlineOverflows {
+            ScrollView(.vertical) {
+                text
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: CGFloat(attention.headlineMaxLines) * IslandAgentAttention.headlineLineHeight)
+            .overlay(alignment: .bottomTrailing) {
+                Text("Scroll for the rest")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.black.opacity(0.75), in: Capsule())
+                    .allowsHitTesting(false)
+            }
+        } else {
+            text
+                .lineLimit(attention.headlineMaxLines)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var choices: some View {

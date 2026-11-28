@@ -361,7 +361,7 @@ struct IslandAgentAttention: Equatable, Sendable {
     /// and the island grows with them instead of cutting off the buttons.
     var measuredCardHeight: CGFloat {
         let textWidth = Self.cardWidth - 40
-        var content = 24 + Self.textHeight(displayHeadline, size: 16, weight: .semibold, width: textWidth, maxLines: 2)
+        var content = 24 + Self.textHeight(displayHeadline, size: 16, weight: .semibold, width: textWidth, maxLines: headlineMaxLines)
         if let commandPreview {
             content += 4 + Self.commandBoxHeight(commandPreview)
         } else if let detail = displayDetail, !detail.isEmpty {
@@ -380,6 +380,24 @@ struct IslandAgentAttention: Equatable, Sendable {
     }
 
     static let cardWidth: CGFloat = 640
+
+    /// A question is the whole point of its card, so it gets room to be read:
+    /// up to six lines in full, then a box that scrolls. Other headlines are
+    /// short and keep two.
+    static let questionHeadlineVisibleLines = 6
+
+    var headlineMaxLines: Int {
+        kind == .question ? Self.questionHeadlineVisibleLines : 2
+    }
+
+    /// True when the headline needs more lines than the card shows.
+    var headlineOverflows: Bool {
+        Self.lineCount(displayHeadline, size: 16, weight: .semibold, width: Self.cardWidth - 40) > headlineMaxLines
+    }
+
+    static var headlineLineHeight: CGFloat {
+        lineHeight(NSFont.systemFont(ofSize: 16, weight: .semibold))
+    }
     static let commandCharactersPerLine = 84
     static let commandVisibleLines = 6
 
@@ -397,14 +415,22 @@ struct IslandAgentAttention: Equatable, Sendable {
         maxLines: Int
     ) -> CGFloat {
         let font = NSFont.systemFont(ofSize: size, weight: weight)
-        let lineHeight = ceil(font.ascender - font.descender + font.leading)
+        let lines = min(lineCount(text, size: size, weight: weight, width: width), maxLines)
+        return CGFloat(lines) * lineHeight(font)
+    }
+
+    private static func lineHeight(_ font: NSFont) -> CGFloat {
+        ceil(font.ascender - font.descender + font.leading)
+    }
+
+    static func lineCount(_ text: String, size: CGFloat, weight: NSFont.Weight, width: CGFloat) -> Int {
+        let font = NSFont.systemFont(ofSize: size, weight: weight)
         let bounds = (text as NSString).boundingRect(
             with: CGSize(width: width, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: [.font: font]
         )
-        let lines = min(max(Int((bounds.height / lineHeight).rounded(.up)), 1), maxLines)
-        return CGFloat(lines) * lineHeight
+        return max(Int((bounds.height / lineHeight(font)).rounded(.up)), 1)
     }
 
     private var permissionSubject: String {
