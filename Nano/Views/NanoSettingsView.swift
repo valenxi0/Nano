@@ -1919,6 +1919,8 @@ private struct AgentSettingsPane: View {
                 .settingsAnchor("agents.cmux")
             }
 
+            AgentAlertSettingsSections(settings: settings, alerts: viewModel.agentAlerts)
+
             SettingsCard {
                 ClaudeLocalUsageRow(settings: settings, service: viewModel.agentService)
             }

@@ -24,6 +24,10 @@ struct IslandNotificationView: View {
                 AgentSetupCard(provider: provider, viewModel: viewModel)
                     .opacity(revealed ? 1 : 0)
                     .animation(notificationRevealAnimation, value: revealed)
+            } else if case let .usage(alert) = notification.payload {
+                AgentUsageAlertCard(alert: alert, settings: settings)
+                    .opacity(revealed ? 1 : 0)
+                    .animation(notificationRevealAnimation, value: revealed)
             } else if case let .update(update) = notification.payload {
                 UpdateNoticeCard(update: update, viewModel: viewModel)
                     .opacity(revealed ? 1 : 0)
@@ -195,7 +199,7 @@ struct IslandNotificationView: View {
         case let .bluetooth(category, _):
             Image(systemName: category.symbol)
                 .font(.system(size: 12, weight: .semibold))
-        case .system, .agent, .agentSetup, .update, .quillSuggestion:
+        case .system, .agent, .agentSetup, .update, .quillSuggestion, .usage:
             EmptyView()
         }
     }
@@ -222,7 +226,7 @@ struct IslandNotificationView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(connected ? Color.green : Color.white.opacity(0.5))
             }
-        case .timer, .system, .agent, .agentSetup, .update, .quillSuggestion:
+        case .timer, .system, .agent, .agentSetup, .update, .quillSuggestion, .usage:
             EmptyView()
         }
     }
@@ -279,7 +283,7 @@ struct IslandNotificationView: View {
                     Text(notification.title).font(.system(size: 14, weight: .medium)).lineLimit(1)
                 }
             }
-        case .system, .agent, .agentSetup, .update, .quillSuggestion:
+        case .system, .agent, .agentSetup, .update, .quillSuggestion, .usage:
             EmptyView()
         }
     }
@@ -309,7 +313,7 @@ struct IslandNotificationView: View {
                     .symbolRenderingMode(.hierarchical)
             }
             .foregroundStyle(notification.tint)
-        case .agent, .system, .agentSetup, .update, .quillSuggestion:
+        case .agent, .system, .agentSetup, .update, .quillSuggestion, .usage:
             EmptyView()
         default:
             if let subtitle = notification.subtitle, !subtitle.isEmpty {
@@ -1602,6 +1606,70 @@ private struct QuillSuggestionCard: View {
 }
 
 /// Offer to connect an agent that appeared after setup. Shown once per agent.
+/// A usage window past the threshold, or back after a reset: who, which
+/// window, how much, and when it resets.
+private struct AgentUsageAlertCard: View {
+    let alert: AgentUsageAlert
+    @ObservedObject var settings: NanoSettings
+
+    private var used: Double { min(max(alert.window.usedPercent, 0), 100) }
+
+    private var headline: String {
+        let window = "\(alert.provider.title) \(alert.window.label)"
+        switch alert.kind {
+        case .threshold:
+            return settings.usageDisplayMode == .used
+                ? "\(window): \(Int(used.rounded()))% used"
+                : "\(window): \(Int(alert.window.remainingPercent.rounded()))% left"
+        case .reset:
+            return "\(window) limit reset"
+        }
+    }
+
+    private var detail: String {
+        switch alert.kind {
+        case .threshold:
+            return alert.window.resetCountdown.map { "Resets in \($0)" } ?? "Close to the limit"
+        case .reset:
+            return "\(Int(alert.window.remainingPercent.rounded()))% available again"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            AgentBrandMark(provider: alert.provider, size: 20)
+                .frame(width: 34, height: 34)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(headline)
+                        .font(.system(size: 14, weight: .semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    Text(detail)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(.white.opacity(0.12))
+                        Capsule()
+                            .fill(alert.kind == .reset ? Color.green.opacity(0.8) : alert.provider.accentColor)
+                            .frame(width: proxy.size.width * used / 100)
+                    }
+                }
+                .frame(height: 5)
+                .accessibilityHidden(true)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .foregroundStyle(.white)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct AgentSetupCard: View {
     let provider: AgentProviderID
     @ObservedObject var viewModel: IslandViewModel

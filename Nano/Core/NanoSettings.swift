@@ -357,6 +357,7 @@ final class NanoSettings: ObservableObject {
         static let usageDisplayMode = "agents.usageDisplayMode"
         static let claudeConfigDirectory = "agents.claudeConfigDirectory"
         static let opensSessionsInCmux = CmuxSessionJump.settingKey
+        static let agentAlerts = "agents.alerts"
         static let claudeLocalUsageMigration = "agents.claudeLocalUsageMigration"
         static let trackAllSupportedMigration = "agents.trackAllSupported"
         static let trackGrokMigration = "agents.trackGrok"
@@ -644,6 +645,15 @@ final class NanoSettings: ObservableObject {
     /// default; it does nothing for sessions that don't run in cmux.
     @Published var opensSessionsInCmux: Bool {
         didSet { defaults.set(opensSessionsInCmux, forKey: Key.opensSessionsInCmux) }
+    }
+
+    /// Sounds, quiet conditions and reminders for agent alerts, kept as one
+    /// value. Sounds are on by default.
+    @Published var agentAlerts: AgentAlertPreferences {
+        didSet {
+            guard agentAlerts != oldValue, let data = try? JSONEncoder().encode(agentAlerts) else { return }
+            defaults.set(data, forKey: Key.agentAlerts)
+        }
     }
 
     @Published var checksForUpdates: Bool {
@@ -1142,6 +1152,9 @@ final class NanoSettings: ObservableObject {
         trayShowsCompactCount = defaults.object(forKey: Key.trayShowsCompactCount) as? Bool ?? true
         checksForUpdates = defaults.object(forKey: Key.checksForUpdates) as? Bool ?? true
         opensSessionsInCmux = defaults.object(forKey: Key.opensSessionsInCmux) as? Bool ?? true
+        agentAlerts = defaults.data(forKey: Key.agentAlerts)
+            .flatMap { try? JSONDecoder().decode(AgentAlertPreferences.self, from: $0) }
+            ?? AgentAlertPreferences()
         preferredMediaPlayer = defaults.string(forKey: Key.preferredMediaPlayer)
             .flatMap(MediaPlayerKind.init(rawValue:))
 

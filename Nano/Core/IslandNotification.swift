@@ -463,6 +463,8 @@ struct IslandNotification: Identifiable, Equatable, Sendable {
         case update(NanoUpdate)
         /// Something Quill learned from the user's fixes, offered to keep.
         case quillSuggestion(VoiceDictationCorrection)
+        /// A usage window past the user's threshold, or back after a reset.
+        case usage(AgentUsageAlert)
     }
 
     let id: UUID
@@ -509,7 +511,7 @@ struct IslandNotification: Identifiable, Equatable, Sendable {
             return 30
         case .system:
             return 60
-        case .agentSetup:
+        case .agentSetup, .usage:
             return 10 * 60
         case .update, .quillSuggestion:
             return nil
@@ -538,6 +540,9 @@ struct IslandNotification: Identifiable, Equatable, Sendable {
            let provider = attention.provider {
             return provider.accentColor
         }
+        if case let .usage(alert) = payload {
+            return alert.provider.accentColor
+        }
         switch source {
         case .volume: return Color.white
         case .brightness: return Color.white
@@ -561,7 +566,7 @@ struct IslandNotification: Identifiable, Equatable, Sendable {
     var fitsMiniIsland: Bool {
         switch payload {
         case .level, .battery, .bluetooth, .timer: true
-        case .system, .agent, .agentSetup, .update, .quillSuggestion: false
+        case .system, .agent, .agentSetup, .update, .quillSuggestion, .usage: false
         }
     }
 
@@ -587,6 +592,8 @@ struct IslandNotification: Identifiable, Equatable, Sendable {
             return CGSize(width: IslandAgentAttention.cardWidth, height: attention.cardHeight)
         case .agentSetup:
             return CGSize(width: 560, height: 132)
+        case .usage:
+            return CGSize(width: 520, height: 86)
         case .update, .quillSuggestion:
             return CGSize(width: 560, height: 116)
         }
@@ -777,6 +784,24 @@ struct IslandNotification: Identifiable, Equatable, Sendable {
     }
 
     static let updateCoalesceKey = "nano-update"
+
+    static func usage(_ alert: AgentUsageAlert) -> Self {
+        let percent = Int(alert.window.usedPercent.rounded())
+        let title = alert.kind == .threshold
+            ? "\(alert.provider.title) \(alert.window.label) limit at \(percent)%"
+            : "\(alert.provider.title) \(alert.window.label) limit reset"
+        return IslandNotification(
+            id: UUID(),
+            source: .agent,
+            title: title,
+            subtitle: alert.kind == .threshold ? alert.window.resetCountdown.map { "Resets in \($0)" } : "\(percent)% used now",
+            symbol: alert.kind == .threshold ? "gauge.with.dots.needle.67percent" : "arrow.clockwise",
+            duration: 8,
+            coalesceKey: "usage:\(alert.key)",
+            payload: .usage(alert),
+            createdAt: Date()
+        )
+    }
 
     static func quillSuggestion(_ correction: VoiceDictationCorrection) -> Self {
         IslandNotification(
