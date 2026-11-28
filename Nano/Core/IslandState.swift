@@ -125,6 +125,12 @@ final class IslandViewModel: ObservableObject {
     }
     let cueQuickCapture = QuickCaptureHotkey(id: 1)
     let mixerMicMuteHotkey = QuickCaptureHotkey(id: 2)
+    /// ⌃⌥1–9 for the question card on screen.
+    let agentOptionHotkeys = AgentOptionHotkeys()
+    /// The options of `optionHotkeyRequestID` that have a working chord, for
+    /// the hints on the card.
+    @Published private(set) var optionHotkeyIndices: Set<Int> = []
+    @Published private(set) var optionHotkeyRequestID: String?
     @Published private(set) var cueQuickCaptureError: String?
     @Published private(set) var mixerMicMuteHotkeyError: String?
     /// The app a shortcut capture came from, reactivated once the cue is saved.
@@ -750,6 +756,13 @@ final class IslandViewModel: ObservableObject {
             .sink { [weak self] _ in
                 Task { @MainActor in self?.objectWillChange.send() }
             }
+            .store(in: &cancellables)
+        agentOptionHotkeys.onChoose = { [weak self] requestID, index in
+            self?.answerQuestion(requestID, optionAt: index)
+        }
+        notificationCenter.$current
+            .receive(on: RunLoop.main)
+            .sink { [weak self] current in self?.syncOptionHotkeys(current) }
             .store(in: &cancellables)
         mediaPeekReadyAt = Date().addingTimeInterval(3)
         mediaController.$nowPlaying
@@ -1835,6 +1848,23 @@ final class IslandViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    private func syncOptionHotkeys(_ current: IslandNotification?) {
+        agentOptionHotkeys.sync(with: AgentOptionHotkeys.target(of: current))
+        optionHotkeyRequestID = agentOptionHotkeys.requestID
+        optionHotkeyIndices = agentOptionHotkeys.activeIndices
+    }
+
+    /// A ⌃⌥number chord: answer the pending question with that option, the
+    /// same as choosing it and pressing Send.
+    func answerQuestion(_ requestID: String, optionAt index: Int) {
+        optionHotkeyRequestID = nil
+        optionHotkeyIndices = []
+        guard let request = hookBridge.pending.first(where: { $0.id == requestID }),
+              request.options.indices.contains(index)
+        else { return }
+        hookBridge.respond(to: requestID, choice: request.options[index].id)
     }
 
     func presentAgentAttention(_ request: AgentHookBridge.PendingRequest) {

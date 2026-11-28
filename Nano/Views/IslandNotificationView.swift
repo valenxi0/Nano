@@ -911,8 +911,9 @@ private struct AgentNotificationCard: View {
     }
 
     private var choices: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(attention.options) { option in
+        let keyed = viewModel.optionHotkeyRequestID == attention.requestID
+        return VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(attention.options.enumerated()), id: \.element.id) { index, option in
                 Button {
                     withAnimation(.easeOut(duration: 0.15)) {
                         selectedOptionID = option.id
@@ -931,6 +932,15 @@ private struct AgentNotificationCard: View {
                             .font(.system(size: 11, weight: .medium))
                             .lineLimit(2)
                         Spacer(minLength: 0)
+                        if keyed, viewModel.optionHotkeyIndices.contains(index) {
+                            Text(AgentOptionHotkeys.label(forOption: index))
+                                .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.4))
+                                .padding(.horizontal, 4)
+                                .frame(height: 15)
+                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(.white.opacity(0.2), lineWidth: 0.75))
+                                .accessibilityLabel("Control Option \(index + 1)")
+                        }
                     }
                     .padding(.horizontal, 10)
                     .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
