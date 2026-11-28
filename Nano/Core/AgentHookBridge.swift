@@ -179,6 +179,12 @@ final class AgentHookBridge: ObservableObject {
         var hostBundleID: String? = nil
         /// The cmux workspace and tab the agent runs in, when it runs in cmux.
         var cmuxLocation: CmuxSessionJump.Location? = nil
+        /// The Warp terminal session the agent runs in, when it runs in Warp.
+        var warpSessionID: String? = nil
+        /// The tmux server and pane the agent runs in, when it runs in tmux.
+        var tmuxLocation: TmuxSessionJump.Location? = nil
+        /// The iTerm2 session the agent runs in, when it runs in iTerm2.
+        var itermSessionID: String? = nil
         var workingDirectory: String?
         /// Supplied by the agent, so the right transcript is known without
         /// enumerating a directory to guess at it.
@@ -435,7 +441,7 @@ final class AgentHookBridge: ObservableObject {
         if event["host_bundle_id"] == nil, let host = payload["host_bundle_id"] as? String {
             event["host_bundle_id"] = host
         }
-        for key in ["cmux_workspace_id", "cmux_surface_id"] where event[key] == nil {
+        for key in ["cmux_workspace_id", "cmux_surface_id", "warp_session_id", "tmux_socket", "tmux_pane", "iterm_session_id"] where event[key] == nil {
             if let value = payload[key] as? String, !value.isEmpty { event[key] = value }
         }
         // Devin's payloads carry no cwd; the bridge script adds the agent's
@@ -810,6 +816,14 @@ final class AgentHookBridge: ObservableObject {
             workspaceID: event["cmux_workspace_id"] as? String,
             surfaceID: event["cmux_surface_id"] as? String
         )
+        // Same rule for Warp: empty outside it, so a resumed session forgets
+        // the old tab.
+        state.warpSessionID = WarpSessionJump.sessionID(event["warp_session_id"] as? String)
+        state.tmuxLocation = TmuxSessionJump.location(
+            socketPath: event["tmux_socket"] as? String,
+            paneID: event["tmux_pane"] as? String
+        )
+        state.itermSessionID = ITermSessionJump.sessionID(event["iterm_session_id"] as? String)
         if let cwd = (event["cwd"] as? String) ?? (event["workspaceRoot"] as? String),
            !cwd.isEmpty {
             state.workingDirectory = cwd
@@ -2298,6 +2312,19 @@ final class AgentHookBridge: ObservableObject {
     cmux_workspace=$(printf '%s' "${CMUX_WORKSPACE_ID:-}" | tr -cd 'A-Fa-f0-9-')
     cmux_surface=$(printf '%s' "${CMUX_SURFACE_ID:-}" | tr -cd 'A-Fa-f0-9-')
 
+    # Warp names the terminal session every shell it runs belongs to, so the
+    # island can focus that exact tab or pane through warp://session/<id>.
+    warp_session=$(printf '%s' "${WARP_TERMINAL_SESSION_UUID:-}" | tr -cd 'A-Fa-f0-9-')
+
+    # tmux names its server socket (TMUX is "<socket>,<pid>,<session>") and
+    # the pane, and iTerm2 names its session ("w0t1p0:<UUID>"), so the island
+    # can select that exact pane or split.
+    tmux_raw=${TMUX:-}
+    tmux_socket=$(printf '%s' "${tmux_raw%%,*}" | tr -cd 'A-Za-z0-9/._-')
+    tmux_pane=$(printf '%s' "${TMUX_PANE:-}" | tr -cd '%0-9')
+    iterm_raw=${ITERM_SESSION_ID:-}
+    iterm_session=$(printf '%s' "${iterm_raw##*:}" | tr -cd 'A-Fa-f0-9-')
+
     # Devin's hook payloads carry no cwd; it exports DEVIN_PROJECT_DIR to hook
     # processes instead. Escape the two characters JSON strings cannot hold
     # verbatim so the path survives as a value.
@@ -2307,8 +2334,8 @@ final class AgentHookBridge: ObservableObject {
     # (Claude in bypass mode approves a command while its PermissionRequest
     # hook is still running) kills them, and the island retracts the card.
     # The socket cannot say so: nc half-closes as soon as it has sent.
-    reply=$(printf '{"token":"%s","source":"%s","host_bundle_id":"%s","project_dir":"%s","parent_session_id":"%s","cmux_workspace_id":"%s","cmux_surface_id":"%s","hook_pids":[%s,%s],"event":%s}\\n' \\
-      "$token" "$source" "$host" "$project_dir" "$parent" "$cmux_workspace" "$cmux_surface" "$$" "$PPID" "$payload" | nc -U "$sock" 2>/dev/null)
+    reply=$(printf '{"token":"%s","source":"%s","host_bundle_id":"%s","project_dir":"%s","parent_session_id":"%s","cmux_workspace_id":"%s","cmux_surface_id":"%s","warp_session_id":"%s","tmux_socket":"%s","tmux_pane":"%s","iterm_session_id":"%s","hook_pids":[%s,%s],"event":%s}\\n' \\
+      "$token" "$source" "$host" "$project_dir" "$parent" "$cmux_workspace" "$cmux_surface" "$warp_session" "$tmux_socket" "$tmux_pane" "$iterm_session" "$$" "$PPID" "$payload" | nc -U "$sock" 2>/dev/null)
 
     if [ -n "$reply" ]; then echo "$reply"; else echo '{}'; fi
     exit 0
