@@ -328,7 +328,7 @@ struct AgentModuleView: View {
                     .padding(.leading, 10)
             }
             if let reply = turn.reply {
-                agentReply(reply, session: session, isNewest: isNewest)
+                agentReply(reply, full: isNewest ? AgentConversationTurn.readableReply(turn.fullReply) : nil, session: session, isNewest: isNewest)
             }
         }
     }
@@ -355,11 +355,11 @@ struct AgentModuleView: View {
     }
 
     @ViewBuilder
-    private func agentReply(_ reply: String, session: AgentSession, isNewest: Bool) -> some View {
+    private func agentReply(_ reply: String, full: String?, session: AgentSession, isNewest: Bool) -> some View {
         Group {
             if isNewest {
-                NanoStreamingText(text: reply)
-                    .lineLimit(8)
+                ExpandableAgentReply(excerpt: reply, full: full)
+                    .id(session.id)
             } else {
                 Text(reply)
                     .foregroundStyle(.white.opacity(0.5))
@@ -450,7 +450,11 @@ struct AgentModuleView: View {
     /// What is left to do once the result has been read: go there, take the
     /// reply elsewhere, or put the row away.
     private func detailActions(_ session: AgentSession) -> some View {
-        let reply = session.conversation.last?.fullReply ?? session.lastAgentMessage
+        // The shown turn's full reply: from hooks when they are ahead of the
+        // transcript, else the transcript's.
+        let reply = session.displayedTurns.last?.fullReply
+            ?? session.conversation.last?.fullReply
+            ?? session.lastAgentMessage
         return HStack(spacing: 7) {
             if AgentSessionJump.canJump(session) {
                 detailAction("Open session", symbol: "arrow.up.right") {
@@ -3758,6 +3762,45 @@ struct NanoShimmerText: View {
 /// A new agent reply writes itself in word by word, newest words fading up.
 /// Only a change animates: the first appearance, and Reduce Motion, show the
 /// whole reply at once. About 40 steps per reply, then it sits still.
+/// The newest reply: eight lines, with Show more when the whole reply is
+/// longer or has lines of its own. Expanded, it is the reply as written
+/// (markdown stripped), up to `AgentConversationTurn.readableReplyLimit`.
+struct ExpandableAgentReply: View {
+    let excerpt: String
+    let full: String?
+    @State private var expanded = false
+
+    static let collapsedLines = 8
+
+    /// Worth a toggle only when expanding shows something the excerpt does not.
+    static func hasMore(excerpt: String, full: String?) -> Bool {
+        guard let full else { return false }
+        return full.count > excerpt.count || full.contains("\n")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if expanded, let full {
+                Text(full)
+                    .foregroundStyle(.white.opacity(0.86))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                NanoStreamingText(text: excerpt)
+                    .lineLimit(Self.collapsedLines)
+            }
+            if Self.hasMore(excerpt: excerpt, full: full) {
+                Button(expanded ? "Show less" : "Show more") {
+                    withAnimation(.snappy(duration: 0.22)) { expanded.toggle() }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.5))
+            }
+        }
+    }
+}
+
 struct NanoStreamingText: View {
     let text: String
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

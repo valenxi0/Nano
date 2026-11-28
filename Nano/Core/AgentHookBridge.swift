@@ -190,6 +190,8 @@ final class AgentHookBridge: ObservableObject {
         var lastUserPrompt: String?
         /// Excerpt of the agent's latest reply, from turn-end hooks.
         var lastAgentMessage: String?
+        /// The same reply in full (capped), for Show more and Copy reply.
+        var lastAgentFullMessage: String?
         var model: String?
         var firstSeen: Date
         var lastEventAt: Date
@@ -833,8 +835,14 @@ final class AgentHookBridge: ObservableObject {
             ?? (event["lastAssistantMessage"] as? String)
             ?? (event["prompt_response"] as? String)
             ?? (name == "AfterAgentResponse" || name == "afterAgentResponse" ? event["text"] as? String : nil)
-        if let reply, let excerpt = AgentSessionPromptSummary.agentExcerpt(reply) {
+        // A subagent's last message is its own, not the session's reply.
+        // Claude Code also writes its suggested next prompt through an unnamed
+        // subagent right after the turn ends, under the parent's session ID,
+        // so that suggestion ("devam") replaced the real reply on the card.
+        if let reply, !Self.isSubagentEvent(name: name, event: event),
+           let excerpt = AgentSessionPromptSummary.agentExcerpt(reply) {
             state.lastAgentMessage = excerpt
+            state.lastAgentFullMessage = String(reply.prefix(AgentConversationTurn.fullReplyLimit))
         }
 
         var finishedTurn = false
@@ -1935,6 +1943,14 @@ final class AgentHookBridge: ObservableObject {
     /// command names the bridge are dropped, and a file holding nothing of
     /// Nano's is not rewritten at all — not even its mtime moves.
     /// Every agent Nano can hook into.
+    /// Subagent lifecycle events, by name or by the `agent_id` Claude Code
+    /// adds to them.
+    nonisolated static func isSubagentEvent(name: String, event: [String: Any]) -> Bool {
+        if event["agent_id"] != nil { return true }
+        return ["subagentstart", "subagentstop", "subagentend", "subagent_stop", "subagent_end"]
+            .contains(name.lowercased())
+    }
+
     nonisolated static let hookableProviders: [AgentProviderID] = [.claude, .codex, .gemini, .cursor, .kimi, .pi, .grok, .opencode, .devin]
 
     /// Removes Nano's hooks for the given agents, or for all of them.

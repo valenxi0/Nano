@@ -516,3 +516,83 @@ final class AgentSubagentSessionTests: XCTestCase {
         XCTAssertEqual(AgentSubagentEntry.duration(from: start, to: start.addingTimeInterval(724), padded: false), "12m 4s")
     }
 }
+
+/// Claude Code writes its suggested next prompt through an unnamed subagent
+/// right after a turn ends, under the parent's session ID. That message must
+/// not replace the session's real reply.
+final class AgentSubagentReplyTests: XCTestCase {
+    @MainActor
+    private func send(_ bridge: AgentHookBridge, _ event: [String: Any]) async throws {
+        let payload: [String: Any] = ["source": "claude", "event": event]
+        _ = await bridge.handle(try JSONSerialization.data(withJSONObject: payload))
+    }
+
+    @MainActor
+    func testASuggestionSubagentDoesNotReplaceTheReply() async throws {
+        let bridge = AgentHookBridge()
+        try await send(bridge, ["hook_event_name": "UserPromptSubmit", "session_id": "s", "cwd": "/tmp", "prompt": "hi"])
+        try await send(bridge, ["hook_event_name": "Stop", "session_id": "s", "cwd": "/tmp",
+                                "last_assistant_message": "Fixed #91; the conflict was in WORKLOG.md."])
+        try await send(bridge, ["hook_event_name": "SubagentStop", "session_id": "s", "cwd": "/tmp",
+                                "agent_id": "af49275e29184f2ef", "agent_type": "",
+                                "last_assistant_message": "devam"])
+        XCTAssertEqual(bridge.sessionStates["s"]?.lastAgentMessage, "Fixed #91; the conflict was in WORKLOG.md.")
+    }
+
+    func testSubagentEventsAreRecognised() {
+        XCTAssertTrue(AgentHookBridge.isSubagentEvent(name: "SubagentStop", event: [:]))
+        XCTAssertTrue(AgentHookBridge.isSubagentEvent(name: "subagent_stop", event: [:]))
+        XCTAssertTrue(AgentHookBridge.isSubagentEvent(name: "Stop", event: ["agent_id": "x"]))
+        XCTAssertFalse(AgentHookBridge.isSubagentEvent(name: "Stop", event: [:]))
+        XCTAssertFalse(AgentHookBridge.isSubagentEvent(name: "AfterAgent", event: [:]))
+    }
+}
+
+/// The newest reply expands to the whole reply, as lines.
+final class AgentReplyExpansionTests: XCTestCase {
+    func testReadableReplyKeepsLinesAndStripsMarkdown() {
+        let raw = "## Done\n\n- **Fixed** `#91`\n- Merged\n\n```swift\nlet x = 1\n```\nNext: deploy."
+        XCTAssertEqual(AgentConversationTurn.readableReply(raw), "Done\nFixed #91\nMerged\nNext: deploy.")
+        XCTAssertEqual(AgentSessionPromptSummary.agentExcerpt(raw), "Done Fixed #91 Merged Next: deploy.",
+                       "rows and cards keep one paragraph")
+    }
+
+    func testReadableReplyKeepsFarMoreThanTheExcerpt() {
+        let raw = String(repeating: "word ", count: 1500)
+        XCTAssertEqual(AgentConversationTurn.readableReply(raw)?.count, AgentConversationTurn.readableReplyLimit)
+    }
+
+    func testShowMoreOnlyWhenThereIsMore() {
+        XCTAssertFalse(ExpandableAgentReply.hasMore(excerpt: "Done.", full: "Done."))
+        XCTAssertFalse(ExpandableAgentReply.hasMore(excerpt: "Done.", full: nil))
+        XCTAssertTrue(ExpandableAgentReply.hasMore(excerpt: "A B", full: "A\nB"))
+        XCTAssertTrue(ExpandableAgentReply.hasMore(excerpt: "A…", full: "A long reply"))
+    }
+}
+
+/// When hooks are ahead of the transcript, the newest turn is built from
+/// them and still carries the whole reply.
+final class AgentHookFullReplyTests: XCTestCase {
+    @MainActor
+    func testHookKeepsTheWholeReplyBesideItsExcerpt() async throws {
+        let bridge = AgentHookBridge()
+        let long = String(repeating: "Tüm test suite'i bitti ve sonuç şöyle. ", count: 40)
+        for event: [String: Any] in [
+            ["hook_event_name": "UserPromptSubmit", "session_id": "s", "cwd": "/tmp", "prompt": "hi"],
+            ["hook_event_name": "Stop", "session_id": "s", "cwd": "/tmp", "last_assistant_message": long],
+        ] {
+            _ = await bridge.handle(try JSONSerialization.data(withJSONObject: ["source": "claude", "event": event]))
+        }
+        let state = try XCTUnwrap(bridge.sessionStates["s"])
+        XCTAssertLessThanOrEqual(state.lastAgentMessage?.count ?? 0, 280)
+        XCTAssertEqual(state.lastAgentFullMessage, long)
+    }
+
+    func testATurnBuiltFromHooksCarriesTheFullReply() {
+        var session = AgentSession(id: "s", provider: .claude, projectName: "p", lastActivityAt: Date())
+        session.lastUserPrompt = "newest prompt"
+        session.lastAgentMessage = "short…"
+        session.lastAgentFullMessage = "short and then the rest of it"
+        XCTAssertEqual(session.displayedTurns.last?.fullReply, "short and then the rest of it")
+    }
+}

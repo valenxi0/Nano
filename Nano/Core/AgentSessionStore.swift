@@ -557,13 +557,21 @@ struct AgentConversationTurn: Equatable, Sendable {
     }
 
     /// Parsers collect raw text; only the turns that are kept get cleaned.
+    /// The newest reply as lines, for reading in full on the session.
+    static let readableReplyLimit = 4000
+    static let fullReplyLimit = 8000
+
+    static func readableReply(_ raw: String?) -> String? {
+        raw.flatMap { AgentSessionPromptSummary.agentExcerpt($0, limit: readableReplyLimit, separator: "\n") }
+    }
+
     static func finalized(_ turns: [AgentConversationTurn]) -> [AgentConversationTurn] {
         let kept = turns.suffix(limit)
         return kept.enumerated().compactMap { index, turn in
             var cleaned = turn
             cleaned.prompt = turn.prompt.flatMap { AgentSessionPromptSummary.body($0) }
             cleaned.reply = turn.reply.flatMap { AgentSessionPromptSummary.agentExcerpt($0, limit: 700) }
-            cleaned.fullReply = index == kept.count - 1 ? turn.reply.map { String($0.prefix(8000)) } : nil
+            cleaned.fullReply = index == kept.count - 1 ? turn.reply.map { String($0.prefix(fullReplyLimit)) } : nil
             guard cleaned.prompt != nil || cleaned.reply != nil || !cleaned.tools.isEmpty else {
                 return nil
             }
@@ -826,6 +834,8 @@ struct AgentSession: Identifiable, Equatable, Sendable {
     /// The agent's latest reply to the user, trimmed to a short excerpt. What
     /// people actually want to read when they open a session.
     var lastAgentMessage: String?
+    /// The latest reply in full (capped), when hooks reported it.
+    var lastAgentFullMessage: String?
     var currentActivity: String?
     var model: String?
     var gitBranch: String?
@@ -886,11 +896,15 @@ struct AgentSession: Identifiable, Equatable, Sendable {
             // `lastUserPrompt` is the first line, possibly cut with an ellipsis.
             let stem = latest.replacingOccurrences(of: "\u{2026}", with: "")
             if turns.last?.prompt?.hasPrefix(stem) != true {
-                turns.append(AgentConversationTurn(prompt: latest, reply: lastAgentMessage))
+                var turn = AgentConversationTurn(prompt: latest, reply: lastAgentMessage)
+                turn.fullReply = lastAgentFullMessage
+                turns.append(turn)
             }
         }
         if turns.isEmpty, let lastAgentMessage {
-            turns.append(AgentConversationTurn(reply: lastAgentMessage))
+            var turn = AgentConversationTurn(reply: lastAgentMessage)
+            turn.fullReply = lastAgentFullMessage
+            turns.append(turn)
         }
         return turns
     }
@@ -925,6 +939,7 @@ struct AgentSession: Identifiable, Equatable, Sendable {
             && lhs.lastActivityAt == rhs.lastActivityAt
             && lhs.currentActivity == rhs.currentActivity
             && lhs.lastAgentMessage == rhs.lastAgentMessage
+            && lhs.lastAgentFullMessage == rhs.lastAgentFullMessage
             && lhs.needsAttention == rhs.needsAttention
             && lhs.nanoDecision == rhs.nanoDecision
             && lhs.contextUsed == rhs.contextUsed
@@ -2133,6 +2148,10 @@ final class AgentSessionStore: ObservableObject {
             session.lastAgentMessage = reply
             changed = true
         }
+        if let full = state.lastAgentFullMessage, session.lastAgentFullMessage != full {
+            session.lastAgentFullMessage = full
+            changed = true
+        }
         if let parent = state.parentSessionID, session.parentSessionID != parent {
             session.parentSessionID = parent
             changed = true
@@ -2185,6 +2204,7 @@ final class AgentSessionStore: ObservableObject {
         built.lastUserPrompt = state.lastUserPrompt.map(Self.firstDisplayLine)
         built.turnStartedAt = state.turnStartedAt
         built.lastAgentMessage = state.lastAgentMessage
+        built.lastAgentFullMessage = state.lastAgentFullMessage
         built.parentSessionID = state.parentSessionID
         _ = AgentSubagent.merge(state.subagents, into: &built.subagents)
 
@@ -4374,6 +4394,7 @@ enum AgentSessionParsers {
             winner.turnStartedAt = started
         }
         if winner.lastAgentMessage == nil { winner.lastAgentMessage = other.lastAgentMessage }
+        if winner.lastAgentFullMessage == nil { winner.lastAgentFullMessage = other.lastAgentFullMessage }
         if winner.workingDirectory == nil {
             winner.workingDirectory = other.workingDirectory
             if winner.projectName == winner.id || winner.projectName == "Session" {
@@ -6088,7 +6109,9 @@ enum AgentSessionPromptSummary {
 
     /// The agent's reply as a short, readable excerpt: markdown chrome and code
     /// blocks dropped, whitespace collapsed.
-    static func agentExcerpt(_ text: String, limit: Int = 280) -> String? {
+    /// Markdown stripped to plain lines. `separator` " " runs them into one
+    /// paragraph for rows and cards; "\n" keeps them as lines for reading.
+    static func agentExcerpt(_ text: String, limit: Int = 280, separator: String = " ") -> String? {
         var lines: [String] = []
         var inFence = false
         for raw in decodingEntities(text).split(separator: "\n", omittingEmptySubsequences: false) {
@@ -6101,7 +6124,7 @@ enum AgentSessionPromptSummary {
                 .replacingOccurrences(of: "`", with: "")
             if !stripped.isEmpty { lines.append(stripped) }
         }
-        let joined = lines.joined(separator: " ")
+        let joined = lines.joined(separator: separator)
         guard !joined.isEmpty else { return nil }
         return joined.count <= limit ? joined : String(joined.prefix(limit - 1)) + "\u{2026}"
     }
