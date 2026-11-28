@@ -14,6 +14,9 @@ struct AgentModuleView: View {
     @State private var collapsed: Set<String> = []
     @State private var expandedActivitySessions: Set<String> = []
     @State private var openActivitySessions: Set<String> = []
+    /// The changed-files list is folded under its summary line by default, so
+    /// a session's reply and actions stay in view. The choice is remembered.
+    @AppStorage("agents.detail.showsChangedFiles") private var showsChangedFiles = false
 
     /// In-progress rename. The store holds which session is being renamed; the
     /// text being typed is view state and dies with the field.
@@ -384,54 +387,69 @@ struct AgentModuleView: View {
         let files = Array(session.changedFiles.reversed().prefix(5))
         let hidden = session.changedFiles.count - files.count
         return VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 6) {
-                Text("Changed \(session.changedFiles.count) \(session.changedFiles.count == 1 ? "file" : "files")")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.6))
-                Spacer(minLength: 0)
+            Button {
+                withAnimation(.snappy(duration: 0.22)) { showsChangedFiles.toggle() }
+            } label: {
                 HStack(spacing: 6) {
-                    Text("+\(session.linesAdded)").foregroundStyle(Self.addedTint)
-                    Text("\u{2212}\(session.linesRemoved)").foregroundStyle(Self.removedTint)
-                }
-                .font(.system(size: 11.5, weight: .medium, design: .monospaced))
-            }
-            VStack(spacing: 4) {
-                ForEach(files, id: \.path) { file in
-                    Button { Self.open(file, in: session) } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 10.5))
-                                .foregroundStyle(.white.opacity(0.4))
-                                .frame(width: 13)
-                            Text(file.name)
-                                .font(.system(size: 11.5, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.82))
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer(minLength: 6)
-                            Group {
-                                Text("+\(file.added)").foregroundStyle(Self.addedTint)
-                                Text("\u{2212}\(file.removed)").foregroundStyle(Self.removedTint)
-                            }
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                            Image(systemName: "arrow.up.forward.square")
-                                .font(.system(size: 10.5))
-                                .foregroundStyle(.white.opacity(0.35))
-                        }
-                        .padding(.horizontal, 10)
-                        .frame(height: 28)
-                        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .contentShape(Rectangle())
+                    Text("Changed \(session.changedFiles.count) \(session.changedFiles.count == 1 ? "file" : "files")")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.6))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .rotationEffect(.degrees(showsChangedFiles ? 90 : 0))
+                    Spacer(minLength: 0)
+                    HStack(spacing: 6) {
+                        Text("+\(session.linesAdded)").foregroundStyle(Self.addedTint)
+                        Text("\u{2212}\(session.linesRemoved)").foregroundStyle(Self.removedTint)
                     }
-                    .buttonStyle(.nanoPress)
-                    .help("Open \(file.path)")
+                    .font(.system(size: 11.5, weight: .medium, design: .monospaced))
                 }
+                .contentShape(Rectangle())
             }
-            if hidden > 0 {
-                Text("\(hidden) more")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.38))
-                    .padding(.leading, 10)
+            .buttonStyle(.plain)
+            .help(showsChangedFiles ? "Hide changed files" : "Show changed files")
+            .accessibilityLabel("Changed \(session.changedFiles.count) files")
+            .accessibilityValue(showsChangedFiles ? "Expanded" : "Collapsed")
+            if showsChangedFiles {
+                VStack(spacing: 4) {
+                    ForEach(files, id: \.path) { file in
+                        Button { Self.open(file, in: session) } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "doc.text")
+                                    .font(.system(size: 10.5))
+                                    .foregroundStyle(.white.opacity(0.4))
+                                    .frame(width: 13)
+                                Text(file.name)
+                                    .font(.system(size: 11.5, design: .monospaced))
+                                    .foregroundStyle(.white.opacity(0.82))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer(minLength: 6)
+                                Group {
+                                    Text("+\(file.added)").foregroundStyle(Self.addedTint)
+                                    Text("\u{2212}\(file.removed)").foregroundStyle(Self.removedTint)
+                                }
+                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                Image(systemName: "arrow.up.forward.square")
+                                    .font(.system(size: 10.5))
+                                    .foregroundStyle(.white.opacity(0.35))
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(height: 28)
+                            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.nanoPress)
+                        .help("Open \(file.path)")
+                    }
+                }
+                if hidden > 0 {
+                    Text("\(hidden) more")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.38))
+                        .padding(.leading, 10)
+                }
             }
         }
     }
