@@ -19,6 +19,10 @@ struct IslandRootView: View {
                         ))
                 } else if viewModel.phase.showsChrome {
                     chromeIsland
+                        // Above the island: a long session detail reaches past
+                        // the island's frame, invisible once clipped but still
+                        // taking clicks meant for these buttons.
+                        .zIndex(1)
                         .transition(.asymmetric(
                             insertion: .offset(y: -10).combined(with: .opacity),
                             removal: .offset(y: -6).combined(with: .opacity)
@@ -1585,6 +1589,12 @@ struct DashboardCalendarWidget: View {
 
 /// Home, Cue, and Mixer in the main capsule under the island. Settings and Pin
 /// share a second capsule beside it.
+///
+/// The capsule takes the click itself and routes it by position. With a long
+/// session open, SwiftUI kept delivering clicks to the capsule but not to the
+/// icon-sized Button inside it, so Back worked on short sessions and almost
+/// never on long ones. Routing from the capsule also makes each item's whole
+/// share of the capsule clickable, not just its 32 pt icon.
 struct IslandChromeBar: View {
     var homeSymbol = "house.fill"
     var homeHelp = "Dashboard"
@@ -1598,60 +1608,99 @@ struct IslandChromeBar: View {
     var onMixer: (() -> Void)?
     let onHome: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @GestureState private var pressedIndex: Int?
+
+    static let itemSize: CGFloat = 32
+    static let itemSpacing: CGFloat = 8
+
+    private struct Item {
+        let symbol: String
+        let help: String
+        let selected: Bool
+        /// Nil for the Home item on the dashboard itself, which only marks
+        /// where you are.
+        let action: (() -> Void)?
+    }
+
+    private var items: [Item] {
+        var items = [Item(symbol: homeSymbol, help: homeHelp, selected: homeSelected, action: homeEnabled ? onHome : nil)]
+        if let onCue { items.append(Item(symbol: "checklist", help: "Cue", selected: cueSelected, action: onCue)) }
+        if let onMixer { items.append(Item(symbol: "slider.vertical.3", help: "Mixer", selected: mixerSelected, action: onMixer)) }
+        return items
+    }
+
+    /// The item a point falls on. Items sit centered at their fixed size; each
+    /// owns half the gap on either side, and the outer ones the margin to the
+    /// capsule's edge, so every point of the capsule belongs to one item.
+    static func itemIndex(at x: CGFloat, count: Int, width: CGFloat) -> Int? {
+        guard count > 0, width > 0, x >= 0, x <= width else { return nil }
+        let total = CGFloat(count) * itemSize + CGFloat(count - 1) * itemSpacing
+        let start = (width - total) / 2
+        let index = Int(((x - start + itemSpacing / 2) / (itemSize + itemSpacing)).rounded(.down))
+        return min(max(index, 0), count - 1)
+    }
 
     var body: some View {
-        HStack(spacing: 8) {
-            homeItem
-            if let onCue {
-                chromeItem(symbol: "checklist", selected: cueSelected, help: "Cue", action: onCue)
+        let items = items
+        GeometryReader { proxy in
+            HStack(spacing: Self.itemSpacing) {
+                ForEach(items.indices, id: \.self) { position in
+                    itemView(items[position], pressed: pressedIndex == position)
+                }
             }
-            if let onMixer {
-                chromeItem(symbol: "slider.vertical.3", selected: mixerSelected, help: "Mixer", action: onMixer)
-            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .contentShape(Rectangle())
+            .gesture(pressGesture(items: items, size: proxy.size))
         }
-        // Three items fill the pill; fewer sit centered with the same margins.
-        .padding(.horizontal, 8)
         .foregroundStyle(.white)
     }
 
-    @ViewBuilder
-    private var homeItem: some View {
-        let icon = Image(systemName: homeSymbol)
-            .font(.system(size: 15, weight: .semibold))
-            .frame(width: 32, height: 32)
-            .background(.white.opacity(homeSelected ? 0.16 : 0), in: Circle())
-            .contentTransition(.symbolEffect(.replace))
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: homeSelected)
-
-        if homeEnabled {
-            Button(action: onHome) { icon }
-                .buttonStyle(.nanoPress)
-                .help(homeHelp)
-        } else {
-            icon
-                .accessibilityLabel("Dashboard")
-                .accessibilityAddTraits(.isSelected)
-        }
+    /// The item under a point of a capsule of `size`, or nil outside it.
+    static func itemIndex(at point: CGPoint, count: Int, size: CGSize) -> Int? {
+        guard point.y >= 0, point.y <= size.height else { return nil }
+        return itemIndex(at: point.x, count: count, width: size.width)
     }
 
-    private func chromeItem(
-        symbol: String,
-        selected: Bool,
-        help: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .semibold))
-                .frame(width: 32, height: 32)
-                .background(.white.opacity(selected ? 0.16 : 0), in: Circle())
-                .contentTransition(.symbolEffect(.replace))
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: selected)
-        }
-        .buttonStyle(.nanoPress)
-        .help(help)
-        // Without this VoiceOver reads the symbol's name ("Checklist With Checkmarks").
-        .accessibilityLabel(help)
+    /// Pressed while the pointer stays on the item it went down on; released
+    /// elsewhere, nothing happens, as with a Button.
+    private func pressGesture(items: [Item], size: CGSize) -> some Gesture {
+        let count = items.count
+        return DragGesture(minimumDistance: 0)
+            .updating($pressedIndex) { value, state, _ in
+                let start = Self.itemIndex(at: value.startLocation, count: count, size: size)
+                let current = Self.itemIndex(at: value.location, count: count, size: size)
+                state = start == current ? start : nil
+            }
+            .onEnded { value in
+                guard let start = Self.itemIndex(at: value.startLocation, count: count, size: size),
+                      Self.itemIndex(at: value.location, count: count, size: size) == start
+                else { return }
+                items[start].action?()
+            }
+    }
+
+    private func itemView(_ item: Item, pressed: Bool) -> some View {
+        let active = pressed && item.action != nil
+        return Image(systemName: item.symbol)
+            .font(.system(size: 15, weight: .semibold))
+            .frame(width: Self.itemSize, height: Self.itemSize)
+            .background(.white.opacity(item.selected ? 0.16 : 0), in: Circle())
+            .contentTransition(.symbolEffect(.replace))
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: item.selected)
+            // Same feedback as `.nanoPress`.
+            .scaleEffect(active && !reduceMotion ? 0.97 : 1)
+            .opacity(active ? 0.82 : 1)
+            .animation(
+                active ? .spring(response: 0.18, dampingFraction: 0.8) : .spring(response: 0.28, dampingFraction: 0.72),
+                value: active
+            )
+            .help(item.help)
+            // The capsule handles the mouse; VoiceOver still gets one button
+            // per item. Without a label it reads the symbol's name.
+            .accessibilityElement()
+            .accessibilityLabel(item.help)
+            .accessibilityAddTraits(item.action == nil ? .isSelected : .isButton)
+            .accessibilityAction { item.action?() }
     }
 }
 

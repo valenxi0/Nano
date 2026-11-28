@@ -5422,3 +5422,38 @@ final class StubUpdateFeedProtocol: URLProtocol {
 
     override func stopLoading() {}
 }
+
+/// The chrome capsule routes a click to an item by position, so every point
+/// of the capsule must land on exactly one item, and the right one.
+final class IslandChromeBarRoutingTests: XCTestCase {
+    private let width: CGFloat = 128
+
+    func testASingleItemOwnsTheWholeCapsule() {
+        for x in stride(from: CGFloat(0), through: width, by: 4) {
+            XCTAssertEqual(IslandChromeBar.itemIndex(at: x, count: 1, width: width), 0, "x=\(x)")
+        }
+    }
+
+    func testThreeItemsSplitTheCapsuleAtTheGaps() {
+        // 3 × 32 + 2 × 8 = 112, so items start at 8: [8,40] [48,80] [88,120].
+        XCTAssertEqual(IslandChromeBar.itemIndex(at: 0, count: 3, width: width), 0)
+        XCTAssertEqual(IslandChromeBar.itemIndex(at: 24, count: 3, width: width), 0)
+        XCTAssertEqual(IslandChromeBar.itemIndex(at: 43.9, count: 3, width: width), 0)
+        XCTAssertEqual(IslandChromeBar.itemIndex(at: 44.1, count: 3, width: width), 1)
+        XCTAssertEqual(IslandChromeBar.itemIndex(at: 64, count: 3, width: width), 1)
+        XCTAssertEqual(IslandChromeBar.itemIndex(at: 84.1, count: 3, width: width), 2)
+        XCTAssertEqual(IslandChromeBar.itemIndex(at: 104, count: 3, width: width), 2)
+        XCTAssertEqual(IslandChromeBar.itemIndex(at: 128, count: 3, width: width), 2)
+    }
+
+    func testTwoItemsMeetInTheMiddle() {
+        XCTAssertEqual(IslandChromeBar.itemIndex(at: 63.9, count: 2, width: width), 0)
+        XCTAssertEqual(IslandChromeBar.itemIndex(at: 64.1, count: 2, width: width), 1)
+    }
+
+    func testPointsOutsideTheCapsuleHitNothing() {
+        XCTAssertNil(IslandChromeBar.itemIndex(at: -1, count: 1, width: width))
+        XCTAssertNil(IslandChromeBar.itemIndex(at: width + 1, count: 1, width: width))
+        XCTAssertNil(IslandChromeBar.itemIndex(at: 10, count: 0, width: width))
+    }
+}
