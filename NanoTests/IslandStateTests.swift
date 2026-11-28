@@ -2871,6 +2871,11 @@ final class IslandStateTests: XCTestCase {
     @MainActor
     func testSettingsSearchFindsIndividualSettings() {
         let settings = NanoSettings(defaults: UserDefaults(suiteName: "nano-search-\(UUID().uuidString)")!)
+        // The default surface follows the main screen: Solid Black with a
+        // notch, Hybrid without. Gradient midpoint only exists for Hybrid, so
+        // without this the test passed or failed with whichever display had
+        // focus.
+        settings.appearance = .hybrid
         let results = SettingsSearchItem.search("gradient", settings: settings)
         XCTAssertEqual(results.first?.title, "Gradient midpoint")
         XCTAssertEqual(results.first?.destination, .island)
